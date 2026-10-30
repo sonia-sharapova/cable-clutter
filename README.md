@@ -1,36 +1,43 @@
 # cable-clutter
 Platform that helps people organize and make sense of their cables and wires. 
 
-`cbl` is an offline-first CLI: log the cables and adapters you own, look up
-what a device's ports do, and find out what you're missing to hook things up.
+`cbl` is an offline-first CLI where you can: 
+- log the cables and adapters you own
+- look up a device's ports and their function
+- find out what wires you're missing to hook things up
+- and more to explore!
 
 ## Set it up from GitHub
 
-Works on macOS and Linux. Everything stays on your computer: no account, no
-server, no network after the download.
+Works on macOS and Linux. Local, so only download is necessary (no account / network)
 
 1. **Install Go 1.27 or newer** from [go.dev/dl](https://go.dev/dl/) (on a Mac,
    `brew install go` also works). Check with `go version`.
-2. **Get the code and build it:**
+   
+3. **Get the code and build it:**
    ```sh
    git clone https://github.com/sonia-sharapova/cable-clutter.git
    cd cable-clutter
    go install ./cmd/cbl
    ```
    This puts `cbl` in `~/go/bin`. If `cbl` isn't found afterwards, add that
-   folder to your PATH: `echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.zshrc`
-   (or `~/.bashrc`), then open a new terminal.
-3. **Check it works:** `cbl doctor` prints the catalog size and where your
+   folder to your PATH:
+
+   `echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.zshrc`
+   (or `~/.bashrc`)
+
+   then open a new terminal.
+5. **Check it works:** `cbl doctor` prints the catalog size and where your
    library will live.
-4. **Load the examples (optional):** `cbl demo` adds two ready-made setups, a
+6. **Load the examples (optional):** `cbl demo` adds two ready-made setups, a
    Raspberry Pi desk (monitor, keyboard, mouse, charger) and a laptop desk
    (monitor, speaker), with the devices and cables they need. Running it again
    changes nothing. To try it without touching your own library, run
    `CBL_HOME=/tmp/cbl-try cbl demo` (and the same `CBL_HOME` for the next steps).
-5. **Open the web page:** `cbl serve --open`. It runs at
+7. **Open the web page:** `cbl serve --open`. It runs at
    [127.0.0.1:7878](http://127.0.0.1:7878), only on this computer; stop it with
    Ctrl-C. The page and the commands share one library.
-6. **Add your own things,** on the page (Your network → Inventory or Devices)
+8. **Add your own things,** on the page (Your network → Inventory or Devices)
    or in the terminal:
    ```sh
    cbl add usb-a usb-c --qty 2               # cables, by their two ends
@@ -42,8 +49,8 @@ server, no network after the download.
    your computer (`cbl doctor` shows where). It stays there when you stop the
    server, close the terminal or restart, and is the same library whether you
    use the page or the commands. It isn't synced to other computers.
-7. **Back up** now and then: `cbl export -o backup.json`.
-8. **Update** later with `git pull && go install ./cmd/cbl`. Your library is
+9. **Back up** now and then: `cbl export -o backup.json`.
+10. **Update** later with `git pull && go install ./cmd/cbl`. Your library is
    kept and upgraded in place.
 
 Without cloning, `go install github.com/sonia-sharapova/cable-clutter/cmd/cbl@latest`
