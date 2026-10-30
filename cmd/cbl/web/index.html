@@ -10,20 +10,24 @@
 <body>
 <header class="site-header">
   <h1><a href="#">CABLE&larr;CLUTTER</a></h1>
-  <div class="omnibox">
-    <input id="q" type="search" autocomplete="off" spellcheck="false" aria-label="Search everything"
-      placeholder="search cables, plugs, devices, setups&hellip;  /">
+  <div class="nav-row">
+    <nav>
+      <a href="#route">Find your connection</a>
+      <a href="#explore">Explore</a>
+      <a href="#systems">Your systems</a>
+      <a href="#inventory">Inventory</a>
+      <a href="#wish">Wishlist</a>
+    </nav>
+    <label class="searchbox">
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5"/><path d="M10.2 10.2 15 15"/></svg>
+      <input id="q" type="search" autocomplete="off" spellcheck="false" aria-label="Search everything"
+        placeholder="search everything&hellip;  /">
+    </label>
     <div id="dropdown" hidden>
       <ol id="results"></ol>
       <p id="timing" class="meta"></p>
     </div>
   </div>
-  <nav class="meta">
-    <a href="#inventory">Inventory</a>
-    <a href="#connect">Connect</a>
-    <a href="#systems">Systems</a>
-    <a href="#wish">Wishlist</a>
-  </nav>
 </header>
 
 <main>
@@ -31,9 +35,8 @@
 </main>
 
 <footer class="meta">
-  <div id="meter"></div>
   <div id="stats"></div>
-  <p class="keys">/ search from any page &middot; &uarr;&darr; move &middot; enter open &middot; esc close</p>
+  <div id="meter"></div>
 </footer>
 <script src="app.js"></script>
 </body>

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -55,14 +56,54 @@ func newRoot() *cobra.Command {
 	return root
 }
 
+// loadCatalog is the bundled catalog plus the types you added yourself.
 func loadCatalog() (*catalog.Catalog, error) {
 	start := time.Now()
-	c, err := catalog.LoadCompiled(catalogdata.Compiled, catalogdata.Version)
+	custom, err := loadCustom()
+	if err != nil {
+		return nil, err
+	}
+	c, err := catalog.LoadCompiled(catalogdata.Compiled, catalogdata.Version, custom)
 	if err != nil {
 		return nil, fmt.Errorf("catalog: %w", err)
 	}
 	report("catalog load", start)
 	return c, nil
+}
+
+// loadCustom reads your own catalog entries from the library.
+func loadCustom() (catalog.Custom, error) {
+	var custom catalog.Custom
+	db, err := openLibrary()
+	if err != nil {
+		return custom, err
+	}
+	defer db.Close()
+	entries, err := db.CustomCatalog()
+	if err != nil {
+		return custom, err
+	}
+	for _, e := range entries {
+		switch e.Kind {
+		case "cable", "adapter":
+			var p catalog.CustomPart
+			if err := json.Unmarshal(e.Body, &p); err != nil {
+				return custom, fmt.Errorf("your %s %s: %w", e.Kind, e.ID, err)
+			}
+			if e.Kind == "cable" {
+				custom.Cables = append(custom.Cables, p)
+			} else {
+				custom.Adapters = append(custom.Adapters, p)
+			}
+		case "device":
+			var d catalog.CustomDevice
+			if err := json.Unmarshal(e.Body, &d); err != nil {
+				return custom, fmt.Errorf("your device %s: %w", e.ID, err)
+			}
+			custom.Devices = append(custom.Devices, d)
+		}
+	}
+	return custom, nil
 }
 
 func report(what string, start time.Time) {

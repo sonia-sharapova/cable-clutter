@@ -326,3 +326,139 @@ func TestServeWishlistUseCase(t *testing.T) {
 		t.Errorf("wishes = %+v", wishes)
 	}
 }
+
+func TestServeBookmarks(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "raspberry-pi-3b", "--name", "Pi")
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+
+	post := func(path, body string) (int, map[string]any) {
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(body))
+		req.Header.Set("X-CBL", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v map[string]any
+		json.NewDecoder(res.Body).Decode(&v)
+		return res.StatusCode, v
+	}
+	list := func() []map[string]any {
+		res, err := http.Get(srv.URL + "/api/bookmarks")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v []map[string]any
+		json.NewDecoder(res.Body).Decode(&v)
+		return v
+	}
+
+	if code, v := post("/api/bookmark/add", `{"name":"Retro","from":"Pi","to":"Nowhere"}`); code != http.StatusBadRequest {
+		t.Errorf("unknown device: %d %v", code, v)
+	}
+	code, added := post("/api/bookmark/add", `{"name":" Retro ","from":"Pi","to":"CRT"}`)
+	if code != http.StatusOK || added["name"] != "Retro" {
+		t.Fatalf("add: %d %v", code, added)
+	}
+	if got := list(); len(got) != 1 || got[0]["from"] != "Pi" || got[0]["to"] != "CRT" {
+		t.Fatalf("list: %v", got)
+	}
+	if code, v := post("/api/bookmark/delete", `{"id":"`+added["id"].(string)+`"}`); code != http.StatusOK {
+		t.Fatalf("delete: %d %v", code, v)
+	}
+	if got := list(); len(got) != 0 {
+		t.Errorf("after delete: %v", got)
+	}
+}
+
+func TestServeCustomAdd(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+
+	post := func(body string) (int, map[string]any) {
+		req, _ := http.NewRequest("POST", srv.URL+"/api/custom/add", strings.NewReader(body))
+		req.Header.Set("X-CBL", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v map[string]any
+		json.NewDecoder(res.Body).Decode(&v)
+		return res.StatusCode, v
+	}
+
+	if code, v := post(`{"kind":"cable","name":"Odd lead","ends":["usb-a:m"],"signals":["usb.2.0"]}`); code != http.StatusBadRequest {
+		t.Errorf("one end: %d %v", code, v)
+	}
+	code, v := post(`{"kind":"cable","name":"Odd lead","ends":["usb-a:m","rca*3:m"],"variant":"mine","signals":["video.composite"],"qty":2,"location":"drawer"}`)
+	if code != http.StatusOK || v["added"] != 2.0 {
+		t.Fatalf("custom cable: %d %v", code, v)
+	}
+	code, v = post(`{"kind":"device","name":"Gizmo","nickname":"Gizmo","ports":[{"label":"AV out","end":"rca*3:f","dir":"out","signals":["video.composite"]}]}`)
+	if code != http.StatusOK || v["model"] != "custom-gizmo" {
+		t.Fatalf("custom device: %d %v", code, v)
+	}
+
+	// Both now live in the catalog: the cable in the inventory, the device in routes.
+	res, err := http.Get(srv.URL + "/api/inventory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(inv), "Odd lead") {
+		t.Errorf("inventory lacks the custom cable: %s", inv)
+	}
+	res, err = http.Get(srv.URL + "/api/connect?from=Gizmo&to=CRT")
+	if err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("connect from a custom device: %v %v", err, res.Status)
+	}
+	res.Body.Close()
+}
+
+func TestServeExplore(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "add", "usb-a", "usb-c")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+
+	res, err := http.Get(srv.URL + "/api/explore")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var families []struct {
+		Family     string
+		Connectors []struct {
+			ID    string
+			Parts []struct {
+				Key   string
+				Owned int
+			}
+		}
+	}
+	json.NewDecoder(res.Body).Decode(&families)
+	var names []string
+	owned := 0
+	for _, f := range families {
+		names = append(names, f.Family)
+		for _, c := range f.Connectors {
+			for _, p := range c.Parts {
+				owned += p.Owned
+			}
+		}
+	}
+	if !slices.IsSorted(names) || !slices.Contains(names, "usb") {
+		t.Errorf("families not sorted or missing usb: %v", names)
+	}
+	if owned != 2 { // the cable shows under both of its connectors
+		t.Errorf("owned count across connectors = %d, want 2", owned)
+	}
+}

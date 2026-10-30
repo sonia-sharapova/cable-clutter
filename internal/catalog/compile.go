@@ -35,8 +35,9 @@ func Compile(fsys fs.FS) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// LoadCompiled builds the catalog from a snapshot made by Compile.
-func LoadCompiled(data []byte, version string) (*Catalog, error) {
+// LoadCompiled builds the catalog from a snapshot made by Compile, plus any
+// custom entries from your library.
+func LoadCompiled(data []byte, version string, custom ...Custom) (*Catalog, error) {
 	var snap snapshot
 	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&snap); err != nil {
 		return nil, fmt.Errorf("compiled catalog: %w (run go generate ./...)", err)
@@ -44,6 +45,9 @@ func LoadCompiled(data []byte, version string) (*Catalog, error) {
 	snap.File.Glyphs = map[string]rawGlyph{}
 	for _, g := range snap.Glyphs {
 		snap.File.Glyphs[g.Key] = g.Glyph
+	}
+	for _, cu := range custom {
+		snap.File = snap.File.with(cu)
 	}
 	return build(snap.File, version)
 }

@@ -45,6 +45,10 @@ async function api(path, body) {
   return data;
 }
 
+// searchField dresses a page's own search like the header's: a magnifying
+// glass, then a fine, light input.
+const searchField = (input) => el("label", { class: "searchbox" }, $(".searchbox svg").cloneNode(true), input);
+
 const shortId = (id) => id.replaceAll("-", "").slice(26);
 // What each status means, in the words the page shows and on hover.
 const STATUS = {
@@ -166,13 +170,14 @@ function openEntry(id) {
 
 async function route() {
   const hash = decodeURIComponent(location.hash.slice(1));
-  const [kind = "inventory", ...rest] = (hash || "inventory").split("/"); // the site opens on Inventory
+  let [kind = "route", ...rest] = (hash || "route").split("/"); // the site opens on Route
+  if (kind === "connect") kind = "route"; // its old name
   const arg = rest.join("/");
   for (const a of document.querySelectorAll("nav a")) {
     a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + kind);
   }
   const view = $("#view");
-  const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, inventory: showInventory, connect: showConnect, systems: showSystems, wish: showWish }[kind];
+  const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, inventory: showInventory, route: showRoute, explore: showExplore, systems: showSystems, wish: showWish }[kind];
   if (!render) return;
   fill(view, el("p", { class: "meta" }, "…"));
   try {
@@ -205,6 +210,41 @@ async function showPart(key) {
             el("td", {}, statusTag(it.status), it.held_by ? el("span", { class: "meta" }, " " + it.held_by) : null),
             el("td", {}, it.nickname || ""), el("td", {}, it.location || ""), el("td", {}, it.for || ""))))
       : el("p", { class: "meta" }, "You don't own one yet."),
+  ];
+}
+
+// --- explore: every cable and adapter in the catalog, filed by port type ----
+
+async function showExplore() {
+  const families = await api("/api/explore");
+  const list = el("div", {});
+  const input = el("input", { type: "search", placeholder: "filter, e.g. usb", oninput: () => draw() });
+  const total = new Set(families.flatMap((f) => f.connectors.flatMap((c) => c.parts.map((p) => p.key)))).size;
+  function draw() {
+    const q = input.value.trim().toLowerCase();
+    const has = (text) => text.toLowerCase().includes(q);
+    const shown = families.map((f) => {
+      // A family or connector that matches shows everything under it.
+      if (!q || has(f.family)) return f;
+      const connectors = f.connectors.map((c) => has(c.name) || has(c.id) ? c : { ...c, parts: c.parts.filter((p) => has(p.name)) })
+        .filter((c) => c.parts.length);
+      return { ...f, connectors };
+    }).filter((f) => f.connectors.length);
+    fill(list, shown.length ? shown.map((f) => el("section", { class: "family" },
+      el("h3", { class: "kind-head" }, f.family.toUpperCase()),
+      f.connectors.map((c) => el("details", { class: "connector", open: !!q },
+        el("summary", {}, el("a", { href: "#connector/" + encodeURIComponent(c.id) }, c.name), " ",
+          el("span", { class: "meta" }, `${c.parts.length}`)),
+        el("ul", {}, c.parts.map((p) => el("li", {},
+          el("a", { href: "#part/" + encodeURIComponent(p.key) }, p.name), " ",
+          el("span", { class: "meta" }, p.kind, p.owned ? ` · you own ${p.owned}` : "")))))))) : el("p", {}, "Nothing matches."));
+  }
+  draw();
+  return [
+    el("h2", {}, "Explore"),
+    el("p", { class: "meta" }, `All ${total} cable and adapter types in the catalog, by port type. Open a connector to see everything with that end.`),
+    el("div", { class: "toolbar" }, searchField(input)),
+    list,
   ];
 }
 
@@ -250,8 +290,8 @@ async function showInventory() {
     const n = ["kind", "category", "status"].filter((k) => invFilter[k] !== "all").length + (invFilter.connector ? 1 : 0);
     fill(filterButton, `Filter${n ? ` (${n})` : ""}`);
   };
-  const searchBox = el("input", { type: "search", class: "inline", placeholder: "search your inventory", value: invFilter.query,
-    oninput: (e) => { invFilter.query = e.target.value; draw(); } });
+  const searchBox = searchField(el("input", { type: "search", placeholder: "search your inventory", value: invFilter.query,
+    oninput: (e) => { invFilter.query = e.target.value; draw(); } }));
 
   function draw() {
     filterLabel();
@@ -270,13 +310,14 @@ async function showInventory() {
       el("p", { class: "meta" }, `Showing ${shown.length} type${shown.length === 1 ? "" : "s"} · ${n} item${n === 1 ? "" : "s"}`),
       shown.length
         ? el("table", { class: "inventory" },
-            el("tr", {}, ["item", "ends", "you own", "available"].map((h) => el("th", {}, h))),
+            el("colgroup", {}, ["ends", "item", "count", "free"].map((c) => el("col", { class: c }))),
+            el("tr", {}, ["ends", "item", "count", "available"].map((h) => el("th", {}, h))),
             shown.map((r) => {
               const free = r.items.filter((it) => it.status === "free").length;
               return el("tr", {},
+                el("td", {}, el("pre", { class: "mini", title: r.ends.join(" ↔ ") }, r.outline)),
                 el("td", {}, el("a", { href: "#part/" + encodeURIComponent(r.key) }, r.name),
                   el("span", { class: "sub" }, r.kind, " · ", r.categories.join(", "))),
-                el("td", {}, el("pre", { class: "mini", title: r.ends.join(" ↔ ") }, r.outline)),
                 el("td", {}, r.items.length),
                 el("td", { class: free ? "can" : "cant", title: `${free} of ${r.items.length} available` }, free ? "yes" : "no"));
             }))
@@ -289,6 +330,134 @@ async function showInventory() {
     el("p", { class: "meta" }, `${total} items of ${rows.length} types.`),
     fill(bar, filterButton, searchBox, panel),
     list,
+    addNewForm(),
+  ];
+}
+
+// addNewForm adds a cable, adapter or device the catalog doesn't have, with
+// its ends or ports. It becomes your own catalog entry, so routes and
+// systems can use it like any other. Connectors and signals load on open.
+function addNewForm() {
+  const box = el("details", { class: "box add-new" },
+    el("summary", {}, "+ Add something new: a cable, adapter or device the catalog doesn't have"));
+  box.addEventListener("toggle", async () => {
+    if (!box.open || box.dataset.ready) return;
+    box.dataset.ready = "1";
+    const kit = await api("/api/parts-kit");
+    box.append(...[addNewBody(kit)].flat());
+  });
+  return box;
+}
+
+const GENDERS = [["m", "plug"], ["f", "socket"]];
+
+function addNewBody(kit) {
+  const option = ([value, label], selected) => el("option", { value, selected: value === selected }, label);
+  const connectorSelect = () => el("select", { class: "connector" }, el("option", { value: "" }, "connector"),
+    kit.connectors.map((c) => el("option", { value: c.id }, c.name)));
+  const genderSelect = (g) => el("select", {}, GENDERS.map((o) => option(o, g)));
+  const text = (placeholder, attrs = {}) => el("input", { type: "text", class: "inline", placeholder, ...attrs });
+  const number = (value, attrs = {}) => el("input", { type: "number", class: "inline num", value, min: 1, ...attrs });
+
+  // A drop-down of checkboxes for what an end or port carries.
+  function signalPicker() {
+    const boxes = kit.signals.map((sg) => el("input", { type: "checkbox", value: sg.id }));
+    const summary = el("summary", {}, "carries…");
+    const label = () => {
+      const on = kit.signals.filter((_, i) => boxes[i].checked).map((sg) => sg.name.replace(/ \(.*\)$/, ""));
+      fill(summary, on.length ? on.join(", ") : "carries…");
+    };
+    const kinds = [...new Set(kit.signals.map((sg) => sg.kind))];
+    const picker = el("details", { class: "signals" }, summary,
+      el("div", { class: "signal-grid" }, kinds.map((k) => el("div", {},
+        el("span", { class: "kind-head meta" }, k.toUpperCase()),
+        kit.signals.map((sg, i) => sg.kind === k ? el("label", { class: "check" }, boxes[i], " ", sg.name) : null)))));
+    picker.addEventListener("change", label);
+    picker.value = () => boxes.filter((b) => b.checked).map((b) => b.value);
+    return picker;
+  }
+
+  // Cable and adapter ends: connector, how many plugs (3 for RCA), gender.
+  const ends = el("div", { class: "ends" });
+  const endRow = () => {
+    const conn = connectorSelect(), count = number(1, { title: "how many plugs on this end, e.g. 3 for red/white/yellow RCA" }), g = genderSelect("m");
+    const r = el("div", { class: "link-row" }, conn, el("span", { class: "meta" }, "×"), count, g,
+      el("button", { class: "quiet", title: "Remove this end", onclick: () => r.remove() }, "×"));
+    r.value = () => conn.value && `${conn.value}${count.value > 1 ? "*" + count.value : ""}:${g.value}`;
+    return r;
+  };
+  ends.append(endRow(), endRow());
+  const partSignals = signalPicker();
+  const variant = text("only if the catalog has these ends, e.g. 12v");
+  const volts = number("", { min: 0, step: "any", placeholder: "V" }), amps = number("", { min: 0, step: "any", placeholder: "A" });
+  const qty = number(1), where = text("e.g. drawer 2");
+
+  // Device ports: a label, the socket, which way signals go, what it carries.
+  const ports = el("div", { class: "ports" });
+  const portRow = () => {
+    const label = text("label, e.g. HDMI out", { class: "inline port-label" }), conn = connectorSelect(), g = genderSelect("f");
+    const dir = el("select", {}, [["out", "out"], ["in", "in"], ["both", "both ways"]].map((o) => option(o, "out")));
+    const n = number(1, { title: "how many identical ports" }), carries = signalPicker();
+    const r = el("div", { class: "link-row" }, label, conn, g, dir, el("span", { class: "meta" }, "×"), n, carries,
+      el("button", { class: "quiet", title: "Remove this port", onclick: () => r.remove() }, "×"));
+    r.value = () => conn.value && { label: label.value.trim() || conn.selectedOptions[0].text, end: `${conn.value}:${g.value}`,
+      qty: Number(n.value) || 1, dir: dir.value, signals: carries.value() };
+    return r;
+  };
+  ports.append(portRow());
+
+  const kind = el("select", {}, [["cable", "cable"], ["adapter", "adapter"], ["device", "device"]].map((o) => option(o, "cable")));
+  const name = text("e.g. Grey sync cable");
+  const nickname = text("what you call it (optional)");
+  const partFields = el("div", {},
+    el("div", { class: "field" }, el("span", { class: "meta" }, "ends"), ends,
+      el("div", { class: "row" }, el("button", { class: "quiet", onclick: () => ends.append(endRow()) }, "+ another end"))),
+    el("div", { class: "field" }, el("span", { class: "meta" }, "carries"), partSignals),
+    el("div", { class: "row" },
+      el("label", { class: "field" }, "variant", variant),
+      el("label", { class: "field" }, "volts", volts),
+      el("label", { class: "field" }, "amps", amps)),
+    el("div", { class: "row" },
+      el("label", { class: "field" }, "how many", qty),
+      el("label", { class: "field" }, "where it's kept", where)));
+  const deviceFields = el("div", { hidden: true },
+    el("div", { class: "field" }, el("span", { class: "meta" }, "ports"), ports,
+      el("div", { class: "row" }, el("button", { class: "quiet", onclick: () => ports.append(portRow()) }, "+ another port"))));
+  kind.addEventListener("change", () => {
+    partFields.hidden = kind.value === "device";
+    deviceFields.hidden = kind.value !== "device";
+  });
+
+  const msg = el("div", {});
+  const add = async () => {
+    const body = kind.value === "device"
+      ? { kind: "device", name: name.value, nickname: nickname.value, ports: [...ports.children].map((r) => r.value()).filter(Boolean) }
+      : { kind: kind.value, name: name.value, nickname: nickname.value, ends: [...ends.children].map((r) => r.value()).filter(Boolean),
+          signals: partSignals.value(), variant: variant.value.trim(), volts: Number(volts.value) || 0, amps: Number(amps.value) || 0,
+          qty: Number(qty.value) || 1, location: where.value };
+    try {
+      const res = await api("/api/custom/add", body);
+      await refresh();
+      await route();
+      // route() redrew the page: report on the fresh form.
+      const fresh = document.querySelector(".add-new");
+      if (fresh) fresh.after(el("p", { class: "can" }, res.kind === "device"
+        ? [`Added your ${res.name}. `, el("a", { href: "#device/" + encodeURIComponent(res.name) }, "See its ports")]
+        : [`Added ${res.added} × ${res.name}. `, el("a", { href: "#part/" + encodeURIComponent(res.key) }, "See it")]));
+    } catch (err) {
+      fill(msg, el("p", { class: "warn" }, err.message));
+    }
+  };
+
+  return [
+    el("div", { class: "row" },
+      el("label", { class: "field" }, "it's a", kind),
+      el("label", { class: "field grow" }, "name", name),
+      el("label", { class: "field grow" }, "nickname", nickname)),
+    partFields,
+    deviceFields,
+    msg,
+    el("div", { class: "row" }, el("button", { onclick: add }, "Add to inventory")),
   ];
 }
 
@@ -458,7 +627,7 @@ async function showSystem(name) {
 }
 
 async function showSystems() {
-  const b = await api("/api/builder");
+  const [b, bookmarks] = await Promise.all([api("/api/builder"), api("/api/bookmarks")]);
   const systems = index.entries.filter((e) => e.kind === "system");
   const msg = el("div", {});
   const name = el("input", { type: "text", class: "inline", placeholder: "e.g. Retro corner" });
@@ -490,7 +659,7 @@ async function showSystems() {
     route();
   };
   return [
-    el("h2", {}, "Systems"),
+    el("h2", {}, "Your systems"),
     el("p", { class: "meta" }, "A system is a setup you switch on and off. Its cables are in use while it's on."),
     systems.length
       ? el("table", {},
@@ -501,6 +670,15 @@ async function showSystems() {
             el("td", { class: "meta" }, s.sub),
             el("td", {}, el("button", { class: "quiet", onclick: () => toggle(s) }, s.status === "up" ? "Switch off" : "Switch on")))))
       : el("p", { class: "meta" }, "No systems yet."),
+    el("h3", {}, "Bookmarks"),
+    bookmarks.length
+      ? el("table", {},
+          el("tr", {}, ["route", "", ""].map((h) => el("th", {}, h))),
+          bookmarks.map((m) => el("tr", {},
+            el("td", {}, el("a", { href: routeHash(m.from, m.to) }, m.name || `${m.from} → ${m.to}`)),
+            el("td", { class: "meta" }, m.name ? `${m.from} → ${m.to}` : ""),
+            el("td", {}, el("button", { class: "quiet", onclick: async () => { await api("/api/bookmark/delete", { id: m.id }); route(); } }, "Remove")))))
+      : el("p", { class: "meta" }, "None yet. Find a route on the Route page and bookmark it to keep it here."),
     el("h3", {}, "New system"),
     el("label", { class: "field" }, "name", name),
     el("div", { class: "field" }, el("span", { class: "meta" }, "devices, in order"), chain),
@@ -510,24 +688,90 @@ async function showSystems() {
   ];
 }
 
-async function showConnect() {
+// A route's address: #route/From→To, so a bookmark reopens it.
+const routeHash = (from, to) => "#route/" + encodeURIComponent(from + "→" + to);
+
+async function showRoute(arg) {
   const out = el("div", {});
   const pick = () => el("select", {}, index.devices.map((d) => el("option", {}, d)));
   const from = pick(), to = pick();
-  if (index.devices.length > 1) to.selectedIndex = 1;
+  const [a, b] = arg.split("→");
+  if (index.devices.includes(a) && index.devices.includes(b)) {
+    from.value = a;
+    to.value = b;
+  } else {
+    // Start on the usual job: your Mac (or computer) to a monitor.
+    const first = (re) => index.devices.find((d) => re.test(d));
+    from.value = first(/\bmac|computer|laptop|thinkpad|\bpc\b/i) || index.devices[0] || "";
+    to.value = first(/monitor|display|screen|\btv\b/i) || index.devices.find((d) => d !== from.value) || "";
+  }
   const go = async () => {
     fill(out, el("p", { class: "meta" }, "…"));
+    history.replaceState(null, "", routeHash(from.value, to.value));
     const d = await api(`/api/connect?from=${encodeURIComponent(from.value)}&to=${encodeURIComponent(to.value)}`);
-    fill(out, connectResult(d));
+    fill(out, connectResult(d), systemForm(d, from.value, to.value), bookmarkForm(from.value, to.value));
   };
   from.addEventListener("change", () => fill(out));
   to.addEventListener("change", () => fill(out));
+  if (from.value && from.value === a && to.value === b) go();
   return [
-    el("h2", {}, "Connect"),
+    el("h2", {}, "Find your connection"),
     el("p", { class: "meta" }, "From one device's outputs to the other's inputs: your available cables first, then ones in use, then what to buy."),
     el("div", { class: "row" }, from, el("span", {}, "→"), to, el("button", { onclick: go }, "Find a way")),
     out,
   ];
+}
+
+// systemForm saves the route on show as one of your systems. Cables you
+// don't own yet are previewed and, if ticked, added to your inventory first
+// so the system can use them; untick any you'd rather add yourself.
+function systemForm(d, from, to) {
+  const kinds = ["video", "audio", "data"].filter((k) => d.routes[k]);
+  if (!kinds.length) return null;
+  const yours = new Map();
+  for (const k of kinds) for (const s of d.routes[k].steps) if (!s.buy) yours.set(s.part.key, s.part.name);
+  const buy = d.to_buy || [];
+  const ticks = buy.map((p) => el("input", { type: "checkbox", checked: true, value: p.key }));
+  const name = el("input", { type: "text", class: "inline", value: `${from} → ${to}` });
+  const msg = el("div", {});
+  const save = async () => {
+    try {
+      // The system first: if its name is taken, nothing is added. Its links
+      // are open, so the new cables are used when it's switched on.
+      const res = await api("/api/system/new", { name: name.value, devices: [from, to] });
+      for (const t of ticks.filter((t) => t.checked)) await api("/api/item/add", { part: t.value, qty: 1 });
+      await refresh();
+      location.hash = "#system/" + encodeURIComponent(res.name);
+    } catch (err) {
+      fill(msg, el("p", { class: "warn" }, err.message));
+    }
+  };
+  return el("div", { class: "box save-system" },
+    el("h3", {}, "Add to your systems"),
+    yours.size ? el("p", { class: "meta" }, "Uses from your inventory: ", [...yours.values()].join(", "), ".") : null,
+    buy.length ? [
+      el("p", { class: "meta" }, "Adds to your inventory (untick any you'd rather add yourself later):"),
+      el("ul", {}, buy.map((p, i) => el("li", {}, el("label", { class: "check" }, ticks[i], " ", p.name)))),
+    ] : null,
+    el("div", { class: "row" }, name, el("button", { onclick: save }, "Add system")),
+    msg);
+}
+
+// bookmarkForm saves the route on show to Your systems → Bookmarks. Only
+// the two devices are kept: the cables are worked out again when it opens.
+function bookmarkForm(from, to) {
+  const name = el("input", { type: "text", class: "inline", placeholder: `name (optional), e.g. ${from} → ${to}` });
+  const msg = el("span", { class: "meta" });
+  const save = el("button", { onclick: async () => {
+    try {
+      await api("/api/bookmark/add", { name: name.value, from, to });
+      save.disabled = true;
+      fill(msg, "Saved to ", el("a", { href: "#systems" }, "Your systems"), ".");
+    } catch (err) {
+      fill(msg, el("span", { class: "warn" }, err.message));
+    }
+  } }, "Bookmark");
+  return el("div", { class: "row bookmark" }, name, save, msg);
 }
 
 function connectResult(d) {
@@ -582,6 +826,60 @@ function wishButton(parts, note) {
   return button;
 }
 
+// Common things to shop for, offered when the wishlist search is empty.
+const COMMON_SEARCHES = ["USB-C", "USB-C to HDMI", "USB-A to USB-C", "HDMI", "DisplayPort", "Lightning",
+  "Micro-USB", "Ethernet", "3.5 mm aux", "RCA", "SATA", "power"];
+
+// suggestions drops a list under a search box: common searches on click,
+// then, as you type, those and catalog names containing what you typed.
+// Picking one fills the box and runs its search.
+function suggestions(input) {
+  const list = el("ol", { class: "suggestions", hidden: true });
+  let at = 0;
+  const names = [...new Set(index.entries.filter((e) => ["cable", "adapter", "type"].includes(e.kind)).map((e) => e.title))];
+  const mark = (text, q) => {
+    const i = q ? text.toLowerCase().indexOf(q) : -1;
+    return i < 0 ? text : [text.slice(0, i), el("strong", {}, text.slice(i, i + q.length)), text.slice(i + q.length)];
+  };
+  const pick = (text) => {
+    input.value = text;
+    list.hidden = true;
+    input.dispatchEvent(new Event("input"));
+  };
+  const show = () => {
+    const q = input.value.trim().toLowerCase();
+    const common = COMMON_SEARCHES.filter((c) => c.toLowerCase().includes(q) && lookup(c).length);
+    const found = q ? names.filter((n) => n.toLowerCase().includes(q) && !common.includes(n)).sort((a, b) =>
+      a.toLowerCase().indexOf(q) - b.toLowerCase().indexOf(q) || a.localeCompare(b)) : [];
+    const options = [...common.map((t) => ["common", t]), ...found.map((t) => ["catalog", t])].slice(0, 10);
+    at = 0;
+    fill(list, options.map(([kind, t], n) => el("li", { "aria-selected": String(n === 0),
+      onmousedown: (ev) => { ev.preventDefault(); pick(t); } },
+      el("span", { class: "kind" }, kind), el("span", { class: "title" }, mark(t, q)))));
+    list.hidden = !options.length || (q && options.length === 1 && options[0][1].toLowerCase() === q);
+  };
+  const move = (by) => {
+    const items = list.children;
+    if (!items.length) return;
+    items[at].setAttribute("aria-selected", "false");
+    at = (at + by + items.length) % items.length;
+    items[at].setAttribute("aria-selected", "true");
+    items[at].scrollIntoView({ block: "nearest" });
+  };
+  input.addEventListener("focus", show);
+  input.addEventListener("click", show);
+  input.addEventListener("input", show);
+  input.addEventListener("blur", () => { list.hidden = true; });
+  input.addEventListener("keydown", (e) => {
+    if (list.hidden) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+    else if (e.key === "Enter" && list.children[at]) { e.preventDefault(); pick(list.children[at].querySelector(".title").textContent); }
+    else if (e.key === "Escape") list.hidden = true;
+  });
+  return list;
+}
+
 async function showWish() {
   const wishes = await api("/api/wish");
   const results = el("ul", { class: "wish-results" });
@@ -589,13 +887,14 @@ async function showWish() {
     await api("/api/wish/add", { parts: [key], note: "" });
     route();
   };
-  const searchBox = el("input", { type: "search", class: "inline", placeholder: "find a cable or adapter to add",
-    oninput: (e) => {
-      const hits = lookup(e.target.value).map((i) => index.entries[i]).filter((x) => ["cable", "adapter", "type"].includes(x.kind)).slice(0, 8);
+  const input = el("input", { type: "search", placeholder: "find a cable or adapter to add",
+    oninput: () => {
+      const hits = lookup(input.value).map((i) => index.entries[i]).filter((x) => ["cable", "adapter", "type"].includes(x.kind)).slice(0, 8);
       fill(results, hits.map((x) => el("li", {},
         el("button", { class: "quiet", onclick: () => add(x.id.slice(5)) }, "+ add"), " ", x.title, " ",
         el("span", { class: "meta" }, x.kind === "type" ? "" : "· you own some"))));
     } });
+  const searchBox = el("div", { class: "suggest-wrap" }, searchField(input), suggestions(input));
   const done = async (id) => {
     await api("/api/wish/done", { id });
     await refresh();
@@ -607,15 +906,17 @@ async function showWish() {
     results,
     wishes.length
       ? el("table", { class: "wishlist" },
-          el("tr", {}, ["acquired", "item", "qty", "use case"].map((h) => el("th", {}, h))),
-          wishes.map((w) => el("tr", { class: w.done ? "done" : "" },
+          el("colgroup", {}, ["check", "item", "qty", "use"].map((c) => el("col", { class: c }))),
+          el("tr", {}, el("th", { title: "acquired" }, "✓"), el("th", {}, "item"), el("th", { class: "num" }, "qty"), el("th", {}, "use case")),
+          // Still wanted first, then what you've got, each oldest first.
+          wishes.toSorted((a, b) => a.done - b.done).map((w) => el("tr", { class: w.done ? "done" : "" },
             el("td", {}, el("input", { type: "checkbox", checked: w.done, disabled: w.done,
               title: w.done ? "Acquired: it's in your inventory" : "Tick when you have it: it moves into your inventory",
               onchange: () => done(w.id) })),
             el("td", {}, el("a", { href: "#part/" + encodeURIComponent(w.part) }, w.name)),
-            el("td", {}, w.qty),
+            el("td", { class: "num" }, w.qty),
             el("td", { class: "meta" }, w.use_case))))
-      : el("p", { class: "meta" }, "Empty. Search above, or connect two devices to see what you're missing."),
+      : el("p", { class: "meta" }, "Empty. Search above, or find a route between two devices to see what you're missing."),
   ];
 }
 
@@ -624,14 +925,8 @@ async function showWish() {
 
 function footer(bytes) {
   const c = index.counts;
-  const total = (c.cable || 0) + (c.adapter || 0);
-  const used = c["in use"] || 0;
-  const cells = 24;
-  const n = total ? Math.round((used / total) * cells) : 0;
-  fill($("#meter"),
-    "Cables in use ",
-    el("span", { class: "cells" }, el("span", { class: "used" }, "▮".repeat(n)), "▯".repeat(cells - n)),
-    ` ${used} of ${total} · ${c.devices || 0} devices`);
+  const count = (n, noun) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  $("#meter").textContent = `${count(c.cable || 0, "cable")}, ${count(c.devices || 0, "device")}`;
   $("#stats").textContent = `Page size ${(bytes / 1024).toFixed(1)} KiB · catalog ${index.catalog} · index served in ${index.server_ms} ms, built in ${index.ms.toFixed(1)} ms`;
 }
 

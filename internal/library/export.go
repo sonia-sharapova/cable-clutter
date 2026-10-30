@@ -14,7 +14,7 @@ import (
 const ExportFormat = "cable-clutter-export"
 
 // exportTables in foreign-key order: a table only references ones before it.
-var exportTables = []string{"devices", "cable_items", "adapter_items", "systems", "links", "wishlist", "custom_catalog"}
+var exportTables = []string{"devices", "cable_items", "adapter_items", "systems", "links", "wishlist", "custom_catalog", "bookmarks"}
 
 // Export is a plain-JSON copy of every live row, keeping ids, so a backup
 // restores exactly and a future sync can match rows.

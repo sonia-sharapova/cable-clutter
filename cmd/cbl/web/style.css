@@ -7,6 +7,7 @@
   --color-free: #006951;
   --color-reserved: #162dab;
   --color-inuse: #d11305;
+  --color-hover: #2b6e2f; /* forest green */
   --highlight: rgb(0 0 0 / 0.07);
   --monospace: ui-monospace, Menlo, Consolas, monospace;
   --font-small: 0.72rem;
@@ -35,47 +36,58 @@ a { color: inherit; }
 .site-header { margin-bottom: var(--pad-large); }
 .site-header h1 { font-size: 1.5rem; font-weight: normal; letter-spacing: 0.02em; }
 .site-header h1 a { text-decoration: none; }
-nav a { margin-right: var(--pad-large); }
-nav a[aria-current] { color: var(--color-primary); text-decoration: none; }
 
 label { display: block; margin-bottom: var(--pad); }
 
-/* The search box on every page, its results dropping down over the page. */
-.omnibox { position: relative; margin: var(--pad-large) 0 var(--pad); }
-#q {
-  width: 100%;
-  font-size: 1rem;
-  padding: 0.35rem 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid var(--color-primary);
-  border-radius: 0;
-  outline: none;
+/* The tabs, with the search box on every page floated to their right, its
+   results dropping down over the page. One thin rule underlines the row. */
+.nav-row {
+  position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--pad) var(--pad-large);
+  margin: var(--pad-large) 0 var(--pad); padding-bottom: 0.35rem; border-bottom: 1px solid var(--color-primary);
 }
-#dropdown {
-  position: absolute; left: 0; right: 0; top: 100%; z-index: 10;
+nav { font-size: 0.9rem; color: var(--color-sub); }
+nav a { margin-right: var(--pad-large); text-decoration: none; transition: color 0.15s; }
+nav a:last-child { margin-right: 0; }
+nav a:hover { color: var(--color-hover); }
+nav a[aria-current] { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
+nav a[aria-current]:hover { color: var(--color-hover); }
+/* Finer, smaller and lighter than the tabs, with a drawn magnifying glass. */
+.searchbox {
+  display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0 auto;
+  width: 15rem; max-width: 100%; color: rgb(0 0 0 / 0.35);
+}
+.searchbox svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+.searchbox:focus-within { color: var(--color-sub); }
+.searchbox input {
+  flex: 1; min-width: 0;
+  font-size: 0.75rem; font-weight: 300; color: var(--color-sub);
+  padding: 0; background: transparent;
+  border: 0; border-radius: 0; outline: none;
+}
+.searchbox input::placeholder { color: rgb(0 0 0 / 0.3); }
+#dropdown, .suggestions {
+  position: absolute; left: 0; right: 0; top: calc(100% + 1px); z-index: 10;
   max-height: 65vh; overflow-y: auto;
   background: var(--color-bg); border: 1px solid rgb(0 0 0 / 0.18); border-top: 0;
   padding: var(--pad) var(--pad-large);
   box-shadow: 0 6px 14px rgb(0 0 0 / 0.08);
 }
 #dropdown #timing { margin: var(--pad) 0 0; }
+/* Results match the box: smaller, finer and lighter than the page's lists. */
+#results .title, .suggestions .title { font-size: 0.85rem; font-weight: 300; color: rgb(0 0 0 / 0.75); }
+#results .kind, #results .sub, #results .status, .suggestions .kind { font-size: 0.62rem; font-weight: 300; }
+#results .kind, #results .sub, .suggestions .kind { color: rgb(0 0 0 / 0.4); }
+.suggestions .title strong { font-weight: 500; color: var(--color-primary); }
+/* A page's own search box, right-aligned like the header's, with its
+   suggestions dropping down across the row. */
+.suggest-wrap { position: static; display: flex; flex: 1; }
+.filter-bar .searchbox { align-self: center; }
 
-input[type=search]:not(#q) {
-  width: 100%;
-  font-size: 1.1rem;
-  padding: var(--pad) 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid var(--color-primary);
-  outline: none;
-  border-radius: 0;
-}
 
-#results { list-style: none; }
-#results li { padding: var(--pad) var(--pad); margin: 0 calc(-1 * var(--pad)); cursor: pointer; }
-#results li[aria-selected=true] { background: var(--highlight); }
-#results li:hover { background: var(--highlight); }
+#results, .suggestions { list-style: none; }
+#results li, .suggestions li { padding: 0.35rem var(--pad); margin: 0 calc(-1 * var(--pad)); cursor: pointer; }
+#results li[aria-selected=true], .suggestions li[aria-selected=true] { background: var(--highlight); }
+#results li:hover, .suggestions li:hover { background: var(--highlight); }
 .title { font-size: 1rem; }
 .kind { font-size: var(--font-small); color: var(--color-sub); text-transform: uppercase; margin-right: var(--pad); }
 .sub { display: block; font-size: var(--font-small); color: var(--color-sub); font-family: var(--monospace); }
@@ -134,12 +146,10 @@ details pre { margin-top: 0.3rem; }
 button[disabled] { opacity: 0.4; cursor: default; }
 button[disabled]:hover { background: transparent; color: var(--color-primary); }
 
-.toolbar { display: flex; gap: var(--pad); align-items: center; flex-wrap: wrap; margin: var(--pad) 0; }
-.toolbar input.inline { flex: 1; }
+.toolbar { position: relative; display: flex; gap: var(--pad); align-items: center; flex-wrap: wrap; margin: var(--pad) 0; }
 /* Inventory filter: an underlined "Filter ⌄" under the title; clicking it
    opens the dropdowns below it, with no box around them. */
 .filter-bar { display: grid; grid-template-columns: auto 1fr; column-gap: var(--pad-large); align-items: stretch; margin: var(--pad) 0; }
-.filter-bar input.inline { align-self: center; }
 button.trigger {
   background: transparent; border: 0; padding: 0 0.1rem; font-size: var(--font-small);
   text-decoration: underline; text-underline-offset: 3px; display: flex; align-items: center;
@@ -154,7 +164,13 @@ button.trigger::after {
 .filter-bar.open .trigger::after { transform: rotate(-135deg); margin-bottom: -0.1em; }
 .filter-panel label { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; font-size: var(--font-small); color: var(--color-sub); }
 .filter-panel button { align-self: flex-end; }
-table.inventory { margin-top: var(--pad); }
+/* Inventory: the drawing first, then a fixed-width name that wraps, then
+   count and available sharing the rest. */
+table.inventory { margin-top: var(--pad); table-layout: fixed; }
+table.inventory col.ends { width: 16rem; }
+table.inventory col.item { width: 13rem; }
+table.inventory td:first-child { overflow: hidden; }
+table.inventory td:nth-child(2) { overflow-wrap: anywhere; padding-right: var(--pad-large); }
 pre.mini { font-size: 0.42rem; line-height: 1.15; padding: 0; border: 0; margin: 0 !important; }
 .box { margin: var(--pad-large) 0; padding: var(--pad) var(--pad-large); background: rgb(255 255 255 / 0.3); }
 .box > summary { font-family: var(--monospace); font-size: var(--font-small); }
@@ -163,7 +179,34 @@ pre.mini { font-size: 0.42rem; line-height: 1.15; padding: 0; border: 0; margin:
 .arrow { color: var(--color-sub); }
 .field { display: flex; flex-direction: column; gap: 0.25rem; margin: var(--pad) 0; }
 label.check { display: inline; margin: 0; }
+/* "Add something new": ends and ports as rows, signals in a drop-down. */
+.add-new .row { align-items: flex-end; }
+.add-new .field { margin: var(--pad) 0 0; }
+.add-new .field.grow { flex: 1; min-width: 10rem; }
+.add-new input.num { width: 4rem; min-width: 0; }
+.add-new input.port-label { width: 10rem; min-width: 0; }
+details.signals { position: relative; font-family: var(--monospace); font-size: var(--font-small); margin: 0; }
+details.signals > summary { border: 1px solid rgb(0 0 0 / 0.18); padding: 0.25rem 0.65rem; background: rgb(255 255 255 / 0.4); max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: var(--pad) var(--pad-large); padding: var(--pad) 0; }
+.signal-grid > div { display: flex; flex-direction: column; gap: 0.15rem; }
+/* Explore: a family heading, then each connector folding open to its parts. */
+.family { margin-bottom: var(--pad-large); }
+details.connector { margin: 0; padding: 0.25rem 0; border-top: 1px dashed rgb(0 0 0 / 0.12); }
+details.connector > summary { font-size: 0.95rem; }
+details.connector ul { margin: 0.2rem 0 var(--pad) 1.2rem !important; }
+.save-system ul { list-style: none; margin: var(--pad) 0 !important; }
 .wish-results { list-style: none; margin-bottom: var(--pad-large) !important; }
+/* Wishlist: fixed columns, so rows line up however many there are; the
+   checkbox sits right against the name. */
+table.wishlist { table-layout: fixed; margin-top: var(--pad); }
+table.wishlist col.check { width: 1.6rem; }
+table.wishlist col.qty { width: 3rem; }
+table.wishlist col.use { width: 32%; }
+table.wishlist th { padding-bottom: 0.35rem; }
+table.wishlist td { border-top: 1px dashed rgb(0 0 0 / 0.15); padding: 0.45rem var(--pad) 0.45rem 0; vertical-align: middle; overflow-wrap: anywhere; }
+table.wishlist td:first-child, table.wishlist th:first-child { padding-right: 0; }
+table.wishlist input[type=checkbox] { display: block; margin: 0; }
+table.wishlist .num { text-align: right; padding-right: var(--pad-large); font-variant-numeric: tabular-nums; }
 tr.done td { color: var(--color-sub); }
 tr.done a { color: var(--color-sub); text-decoration: line-through; }
 table.inventory td { border-top: 1px dashed rgb(0 0 0 / 0.15); padding-top: 0.35rem; }
@@ -190,6 +233,3 @@ input.inline { padding: 0.35rem 0.6rem; min-width: 14rem; }
 
 footer { margin-top: 3rem; padding-top: var(--pad-large); border-top: 1px solid var(--color-sub); }
 footer > * { margin-bottom: var(--pad); }
-.cells { letter-spacing: -0.05em; color: var(--color-primary); }
-.cells .used { color: var(--color-inuse); }
-.keys { font-size: 0.62rem; }

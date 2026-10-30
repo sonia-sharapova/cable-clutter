@@ -90,6 +90,12 @@ func newServer() http.Handler {
 	mux.HandleFunc("POST /api/system/down", api(systemDownHandler))
 	mux.HandleFunc("POST /api/wish/add", api(wishAddHandler))
 	mux.HandleFunc("POST /api/wish/done", api(wishDoneHandler))
+	mux.HandleFunc("GET /api/explore", api(exploreHandler))
+	mux.HandleFunc("GET /api/parts-kit", api(partsKitHandler))
+	mux.HandleFunc("POST /api/custom/add", api(customAddHandler))
+	mux.HandleFunc("GET /api/bookmarks", api(bookmarksHandler))
+	mux.HandleFunc("POST /api/bookmark/add", api(bookmarkAddHandler))
+	mux.HandleFunc("POST /api/bookmark/delete", api(bookmarkDeleteHandler))
 	return mux
 }
 
@@ -787,4 +793,200 @@ func systemDeleteHandler(st *state, r *http.Request) (any, error) {
 		return nil, err
 	}
 	return map[string]string{"removed": s.ID}, st.db.RemoveSystem(s)
+}
+
+type bookmarkJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+func bookmarksHandler(st *state, _ *http.Request) (any, error) {
+	marks, err := st.db.Bookmarks()
+	if err != nil {
+		return nil, err
+	}
+	out := []bookmarkJSON{}
+	for _, b := range marks {
+		out = append(out, bookmarkJSON{b.ID, b.Name, b.From, b.To})
+	}
+	return out, nil
+}
+
+// bookmarkAddHandler saves a route from the Route page. Both ends must be
+// devices the route finder can use, so a bookmark always opens.
+func bookmarkAddHandler(st *state, r *http.Request) (any, error) {
+	var req bookmarkJSON
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	for _, ref := range []string{req.From, req.To} {
+		if _, _, _, err := resolveModel(st.c, st.devices, ref); err != nil {
+			return nil, err
+		}
+	}
+	b, err := st.db.AddBookmark(strings.TrimSpace(req.Name), req.From, req.To)
+	if err != nil {
+		return nil, err
+	}
+	return bookmarkJSON{b.ID, b.Name, b.From, b.To}, nil
+}
+
+func bookmarkDeleteHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	return map[string]string{"removed": req.ID}, st.db.RemoveBookmark(req.ID)
+}
+
+// partsKitHandler is what the "add something new" form picks from: every
+// connector and signal in the catalog.
+func partsKitHandler(st *state, _ *http.Request) (any, error) {
+	type option struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Kind string `json:"kind,omitempty"` // a connector's family, a signal's kind
+	}
+	connectors, signals := []option{}, []option{}
+	for _, cn := range st.c.Connectors {
+		connectors = append(connectors, option{cn.ID, cn.Name, cn.Family})
+	}
+	for _, sg := range st.c.Signals {
+		signals = append(signals, option{sg.ID, sg.Name, sg.Kind})
+	}
+	sort.Slice(connectors, func(i, j int) bool { return strings.ToLower(connectors[i].Name) < strings.ToLower(connectors[j].Name) })
+	sort.Slice(signals, func(i, j int) bool {
+		if signals[i].Kind != signals[j].Kind {
+			return signals[i].Kind < signals[j].Kind
+		}
+		return signals[i].Name < signals[j].Name
+	})
+	return map[string]any{"connectors": connectors, "signals": signals}, nil
+}
+
+// customAddHandler adds a cable, adapter or device the catalog doesn't
+// have: it's stored as your own catalog entry, then logged as yours.
+func customAddHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Kind string `json:"kind"` // cable, adapter or device
+		catalog.CustomPart
+		Ports    []catalog.CustomPort `json:"ports"`
+		Qty      int                  `json:"qty"`
+		Location string               `json:"location"`
+		Nickname string               `json:"nickname"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	switch req.Kind {
+	case "cable", "adapter":
+		kind := catalog.Kind(req.Kind)
+		key, err := st.c.CheckPart(kind, req.CustomPart)
+		if err != nil {
+			return nil, err
+		}
+		body, _ := json.Marshal(req.CustomPart)
+		if err := st.db.AddCustom(library.CustomEntry{Kind: req.Kind, ID: key, Body: body}); err != nil {
+			return nil, err
+		}
+		if req.Qty < 1 {
+			req.Qty = 1
+		}
+		added, err := st.db.AddItems(library.Item{Kind: kind, PartKey: key, Location: req.Location, Nickname: req.Nickname}, req.Qty)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"kind": req.Kind, "key": key, "name": req.Name, "added": len(added)}, nil
+	case "device":
+		d := catalog.CustomDevice{ID: customDeviceID(st.c, req.Name), Name: req.Name, Ports: req.Ports}
+		if req.Name == "" {
+			return nil, errors.New("give the device a name")
+		}
+		if err := st.c.CheckDevice(d); err != nil {
+			return nil, err
+		}
+		nickname := strings.TrimSpace(req.Nickname)
+		if nickname == "" {
+			nickname = d.Name
+		}
+		body, _ := json.Marshal(d)
+		if err := st.db.AddCustom(library.CustomEntry{Kind: "device", ID: d.ID, Body: body}); err != nil {
+			return nil, err
+		}
+		dev, _, err := st.db.AddDevice(d.ID, nickname, "")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"kind": "device", "model": d.ID, "name": dev.Nickname}, nil
+	}
+	return nil, fmt.Errorf("kind must be cable, adapter or device, not %q", req.Kind)
+}
+
+// customDeviceID makes a model id from a name, e.g. "My Gizmo" →
+// custom-my-gizmo, numbered if that's taken.
+func customDeviceID(c *catalog.Catalog, name string) string {
+	slug := strings.Join(strings.FieldsFunc(strings.ToLower(name), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	}), "-")
+	id := "custom-" + slug
+	for n := 2; c.Devices[id] != nil; n++ {
+		id = fmt.Sprintf("custom-%s-%d", slug, n)
+	}
+	return id
+}
+
+// exploreHandler is the whole catalog of cables and adapters, filed by port
+// type: each connector family A–Z, its connectors A–Z, and every part with
+// an end of that connector, with how many of each you own.
+func exploreHandler(st *state, _ *http.Request) (any, error) {
+	type partJSON struct {
+		Key   string `json:"key"`
+		Name  string `json:"name"`
+		Kind  string `json:"kind"`
+		Owned int    `json:"owned"`
+	}
+	type connJSON struct {
+		ID    string     `json:"id"`
+		Name  string     `json:"name"`
+		Parts []partJSON `json:"parts"`
+	}
+	type familyJSON struct {
+		Family     string     `json:"family"`
+		Connectors []connJSON `json:"connectors"`
+	}
+	owned := func(p *catalog.Part) int {
+		if p.Kind == catalog.KindAdapter {
+			return len(st.inv.Adapters.Owned[p.Key])
+		}
+		return len(st.inv.Cables.Owned[p.Key])
+	}
+	byFamily := map[string][]connJSON{}
+	for id, cn := range st.c.Connectors {
+		parts := st.c.ByConnector[id]
+		if len(parts) == 0 {
+			continue
+		}
+		cj := connJSON{ID: id, Name: cn.Name}
+		for _, p := range parts {
+			cj.Parts = append(cj.Parts, partJSON{p.Key, p.Name, string(p.Kind), owned(p)})
+		}
+		sort.Slice(cj.Parts, func(i, j int) bool { return strings.ToLower(cj.Parts[i].Name) < strings.ToLower(cj.Parts[j].Name) })
+		family := cn.Family
+		if family == "" {
+			family = "other"
+		}
+		byFamily[family] = append(byFamily[family], cj)
+	}
+	out := []familyJSON{}
+	for _, f := range sortedKeys(byFamily) {
+		conns := byFamily[f]
+		sort.Slice(conns, func(i, j int) bool { return strings.ToLower(conns[i].Name) < strings.ToLower(conns[j].Name) })
+		out = append(out, familyJSON{f, conns})
+	}
+	return out, nil
 }
