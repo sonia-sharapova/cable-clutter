@@ -29,6 +29,12 @@ cbl adapter add|ls|rm ...                       # adapters have their own invent
 cbl show "grey ps2 av"                          # draw an item's ends side by side
 cbl show usb-a usb-c                            # ...or any catalog type
 
+cbl device add ps2-slim --name PS2              # record a device you own
+cbl device PS2                                  # its ports: what each does, what you
+                                                #   can connect now, what you're missing
+cbl device ls / rm
+cbl catalog devices                             # known models
+
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals
@@ -44,6 +50,8 @@ cbl find aux --timing     # print load and query times
 | `internal/catalog` | Loads and validates the catalog; builds the hashmap indexes and search. |
 | `catalog/glyphs.yaml` | ASCII outline per connector (`#` = contacts: filled on plugs, blank on sockets). |
 | `internal/outline` | Draws a part's ends side by side; golden tests in `testdata/` (`go test ./internal/outline -update` to refresh). |
+| `catalog/devices.yaml` | Device models and their ports (connector, direction, signals, voltage). `confirmed: false` marks port lists resting on an assumption. |
+| `internal/advise` | Per-port report: what you own that fits, what it lets you do, what to buy for the rest, and power supplies of the wrong voltage. |
 | `internal/library` | The user's own data in SQLite (WAL), with numbered migrations. |
 | `cmd/cbl` | The CLI. |
 

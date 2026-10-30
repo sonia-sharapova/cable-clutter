@@ -45,3 +45,22 @@ $cbl adapter add 'usb-c hub with card reader' --name 'hub B'
 $cbl adapter add sata esata --notes 'for the DVD drive'
 $cbl adapter add 'multi-card to compactflash'
 $cbl adapter add sata usb-a-3.0
+
+# Devices. Models marked "ports unconfirmed" in `cbl device ls` rest on an
+# assumption about the exact model; see `cbl device <name>`.
+$cbl device add mac-mini-m2-2023 --name 'Mac mini'
+$cbl device add macbook-pro-13-m1-2020 --name 'MacBook Pro'
+$cbl device add thinkpad-t14-t15-gen1 --name 'ThinkPad'
+$cbl device add raspberry-pi-3b --name 'Raspberry Pi'
+$cbl device add iphone-5 --name 'iPhone 5'
+$cbl device add ipod-2nd-gen --name 'iPod'
+$cbl device add nintendo-3ds --name '3DS'
+$cbl device add psp --name 'PSP'
+$cbl device add ps2-slim --name 'PS2'
+$cbl device add crt-tv --name 'CRT TV'
+$cbl device add dell-monitor --name 'Dell monitor'
+$cbl device add apple-tv-hd --name 'Apple TV'
+$cbl device add camera-battery --name 'Camera (battery)'
+$cbl device add camera-mini-usb --name 'Camera (mini-USB)'
+$cbl device add camera-micro-usb --name 'Camera (micro-USB)'
+$cbl device add te-ob-4 --name 'TE speaker'

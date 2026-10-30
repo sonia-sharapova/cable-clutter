@@ -13,6 +13,7 @@ const (
 	RefCable
 	RefAdapter
 	RefSignal
+	RefDevice
 )
 
 // Ref names one catalog entry: a connector or signal ID, or a part key.
@@ -78,6 +79,9 @@ func (c *Catalog) buildSearch(signals []Signal, connectors []Connector, parts []
 	for _, s := range signals {
 		add(Ref{RefSignal, s.ID}, s.ID, s.Name)
 	}
+	for _, d := range c.deviceOrder {
+		add(Ref{RefDevice, d.ID}, append([]string{d.ID, d.Name}, d.Aliases...)...)
+	}
 	sort.Slice(c.terms, func(i, j int) bool { return c.terms[i].text < c.terms[j].text })
 }
 
@@ -110,6 +114,29 @@ func (c *Catalog) Find(q string) []Ref {
 	}
 	sort.SliceStable(prefix, func(i, j int) bool { return prefix[i].Kind < prefix[j].Kind })
 	return append(out, prefix...)
+}
+
+// ResolveDevice maps a model ID, name or alias ("ps2", "MacBook Pro") to
+// device models: one when it's clear, several when it's ambiguous.
+func (c *Catalog) ResolveDevice(s string) []*DeviceModel {
+	if d, ok := c.Devices[s]; ok {
+		return []*DeviceModel{d}
+	}
+	var exact, prefix []*DeviceModel
+	for _, r := range c.aliases[Normalize(s)] {
+		if r.Kind == RefDevice {
+			exact = append(exact, c.Devices[r.ID])
+		}
+	}
+	if len(exact) > 0 {
+		return exact
+	}
+	for _, r := range c.Find(s) {
+		if r.Kind == RefDevice {
+			prefix = append(prefix, c.Devices[r.ID])
+		}
+	}
+	return prefix
 }
 
 // ResolveConnector maps a connector ID or alias ("aux", "USB C") to its ID.

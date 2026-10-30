@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,6 +23,7 @@ type Connector struct {
 	Family  string
 	Name    string
 	Aliases []string
+	Mates   []string // other connectors it physically plugs into
 }
 
 type Kind string
@@ -56,6 +58,9 @@ type Catalog struct {
 	Adapters    map[string]*Part // canonical key -> adapter type
 	ByConnector map[string][]*Part
 	BySignal    map[string][]*Part
+	Devices     map[string]*DeviceModel
+
+	deviceOrder []*DeviceModel
 
 	glyphs  map[string]Glyph // connector id, "family:<name>" or "default"
 	aliases map[string][]Ref // normalised name -> what it names
@@ -86,6 +91,7 @@ type rawFile struct {
 	Cables     []rawPart
 	Adapters   []rawPart
 	Glyphs     map[string]rawGlyph
+	Devices    []rawDevice
 }
 
 // Load reads every *.yaml file in fsys, validates cross-references and builds
@@ -110,6 +116,7 @@ func Load(fsys fs.FS, version string) (*Catalog, error) {
 		all.Connectors = append(all.Connectors, f.Connectors...)
 		all.Cables = append(all.Cables, f.Cables...)
 		all.Adapters = append(all.Adapters, f.Adapters...)
+		all.Devices = append(all.Devices, f.Devices...)
 		for k, g := range f.Glyphs {
 			if all.Glyphs == nil {
 				all.Glyphs = map[string]rawGlyph{}
@@ -129,6 +136,7 @@ func build(raw rawFile, version string) (*Catalog, error) {
 		Adapters:    make(map[string]*Part, len(raw.Adapters)),
 		ByConnector: make(map[string][]*Part),
 		BySignal:    make(map[string][]*Part),
+		Devices:     make(map[string]*DeviceModel),
 		glyphs:      make(map[string]Glyph),
 		aliases:     make(map[string][]Ref),
 	}
@@ -147,6 +155,19 @@ func build(raw rawFile, version string) (*Catalog, error) {
 			errs = append(errs, fmt.Errorf("connector %q defined twice", cn.ID))
 		}
 		c.Connectors[cn.ID] = cn
+	}
+	// Mating is symmetric: if A's plug fits B's socket, B's fits A's.
+	for _, cn := range c.Connectors {
+		for _, m := range cn.Mates {
+			other, ok := c.Connectors[m]
+			if !ok {
+				errs = append(errs, fmt.Errorf("connector %q mates with unknown %q", cn.ID, m))
+				continue
+			}
+			if !slices.Contains(other.Mates, cn.ID) {
+				other.Mates = append(other.Mates, cn.ID)
+			}
+		}
 	}
 
 	var ordered []*Part // YAML order, so index slices are deterministic
@@ -167,6 +188,7 @@ func build(raw rawFile, version string) (*Catalog, error) {
 	}
 	addParts(KindCable, raw.Cables, c.Cables)
 	addParts(KindAdapter, raw.Adapters, c.Adapters)
+	errs = append(errs, c.addDevices(raw.Devices)...)
 	if err := c.addGlyphs(raw.Glyphs); err != nil {
 		errs = append(errs, err)
 	}

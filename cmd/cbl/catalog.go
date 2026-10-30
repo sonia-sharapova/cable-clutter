@@ -13,10 +13,10 @@ import (
 
 func catalogCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:       "catalog [connectors|cables|adapters|signals]",
+		Use:       "catalog [connectors|cables|adapters|signals|devices]",
 		Short:     "List what the bundled catalog knows about",
 		Args:      cobra.MaximumNArgs(1),
-		ValidArgs: []string{"connectors", "cables", "adapters", "signals"},
+		ValidArgs: []string{"connectors", "cables", "adapters", "signals", "devices"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadCatalog()
 			if err != nil {
@@ -48,8 +48,16 @@ func catalogCmd() *cobra.Command {
 					s := c.Signals[id]
 					fmt.Fprintf(tw, "%s\t%s\t%s\n", s.Kind, s.ID, s.Name)
 				}
+			case "devices":
+				for _, d := range c.DeviceModels() {
+					note := ""
+					if !d.Confirmed {
+						note = "ports unconfirmed"
+					}
+					fmt.Fprintf(tw, "%s\t%s\t%s\n", d.ID, d.Name, note)
+				}
 			default:
-				return fmt.Errorf("unknown list %q: want connectors, cables, adapters or signals", what)
+				return fmt.Errorf("unknown list %q: want connectors, cables, adapters, signals or devices", what)
 			}
 			return nil
 		},

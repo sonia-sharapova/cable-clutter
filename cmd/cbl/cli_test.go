@@ -111,3 +111,37 @@ func TestShow(t *testing.T) {
 		t.Error("show of an unknown thing succeeded")
 	}
 }
+
+func TestDevice(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "add", "ps2-avmulti", "rca*3", "--for", "PS2")
+	mustRun(t, "add", "2-prong", "barrel", "--variant", "5v-2a", "--for", "PSP")
+
+	out := mustRun(t, "device", "add", "ps2", "--name", "PS2")
+	if !strings.Contains(out, `Set the model of "PS2"`) {
+		t.Errorf("device add on a placeholder: %s", out)
+	}
+	out = mustRun(t, "device", "PS2")
+	for _, want := range []string{"Sony PlayStation 2 (slim)", `your "PS2"`, "AV Multi Out", "✓ PlayStation AV cable", "dedicated",
+		"Can't yet: Component video", "⚠ Don't use AC adaptor 5 V 2 A (PSP)", "Ethernet → Ethernet cable"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("device PS2 missing %q:\n%s", want, out)
+		}
+	}
+	// PSP is still a placeholder: fall back to the catalog with a hint.
+	out = mustRun(t, "device", "psp")
+	if !strings.Contains(out, "cbl device add psp --name") {
+		t.Errorf("placeholder hint missing:\n%s", out)
+	}
+	out = mustRun(t, "device", "crt")
+	if !strings.Contains(out, "Ports not confirmed") {
+		t.Errorf("unconfirmed note missing:\n%s", out)
+	}
+	out = mustRun(t, "device", "ls")
+	if !strings.Contains(out, "Sony PlayStation 2 (slim)") || !strings.Contains(out, "(none yet)") {
+		t.Errorf("device ls:\n%s", out)
+	}
+	if _, err := run(t, "device", "toaster"); err == nil {
+		t.Error("unknown device accepted")
+	}
+}

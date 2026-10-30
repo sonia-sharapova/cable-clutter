@@ -45,6 +45,7 @@ func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
 	var conns []*catalog.Connector
 	var parts []*catalog.Part
 	var signals []*catalog.Signal
+	var devices []*catalog.DeviceModel
 	seen := map[string]bool{}
 	addPart := func(p *catalog.Part) {
 		if !seen[p.Key] {
@@ -67,6 +68,8 @@ func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
 			addPart(p)
 		case catalog.RefSignal:
 			signals = append(signals, c.Signals[r.ID])
+		case catalog.RefDevice:
+			devices = append(devices, c.Devices[r.ID])
 		}
 	}
 
@@ -95,6 +98,10 @@ func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
 		for _, p := range ofKind {
 			fmt.Fprintf(tw, "  %s\t%s\t%s\n", p.Name, p.Key, partFlags(p))
 		}
+	}
+	section("Devices", len(devices))
+	for _, d := range devices {
+		fmt.Fprintf(tw, "  %s\t%s\t\n", d.Name, d.ID)
 	}
 	section("Signals", len(signals))
 	for _, s := range signals {

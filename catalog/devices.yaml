@@ -1,0 +1,157 @@
+# Device models and their ports. A port's end is the connector ON THE DEVICE
+# (sockets are "f"; a figure-8 power inlet is "iec-c7:m"); a cable fits when
+# its end has the same connector and the opposite gender. `qty` is how many
+# identical ports there are. Power ports carry `volts` so a wrong-voltage
+# adaptor is never suggested. `confirmed: false` marks port lists that rest
+# on an assumption about the exact model; `assumption` says which.
+devices:
+  - id: mac-mini-m2-2023
+    name: "Mac mini (M2, 2023)"
+    aliases: [mac mini, mac mini m2]
+    confirmed: true
+    ports:
+      - {label: Thunderbolt 4, end: "usb-c:f", qty: 2, dir: both, signals: [usb4, usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb]}
+      - {label: USB-A, end: "usb-a:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, power.usb]}
+      - {label: HDMI, end: "hdmi:f", dir: out, signals: [video.hdmi]}
+      - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+      - {label: Power, end: "iec-c7:m", dir: in, signals: [power.ac]}
+
+  - id: macbook-pro-13-m1-2020
+    name: "MacBook Pro 13-inch (M1, 2020)"
+    aliases: [macbook pro, macbook pro m1, mbp]
+    confirmed: true
+    ports:
+      - {label: Thunderbolt / USB 4, end: "usb-c:f", qty: 2, dir: both, signals: [usb4, usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], note: "Also charges the laptop"}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+
+  - id: thinkpad-t14-t15-gen1
+    name: "Lenovo ThinkPad T14 / T15 (Gen 1)"
+    aliases: [thinkpad, t14, t15]
+    confirmed: false
+    assumption: "Gen 1 Intel ports; later generations differ slightly"
+    ports:
+      - {label: USB-C, end: "usb-c:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], note: "One is Thunderbolt 3 on Intel models; both charge"}
+      - {label: USB-A, end: "usb-a:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, power.usb]}
+      - {label: HDMI, end: "hdmi:f", dir: out, signals: [video.hdmi]}
+      - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
+      - {label: Headset, end: "trs-3.5:f", dir: both, signals: [audio.analog.stereo]}
+
+  - id: raspberry-pi-3b
+    name: "Raspberry Pi 3 Model B / B+"
+    aliases: [raspberry pi, pi, rpi, pi 3]
+    confirmed: false
+    assumption: "micro-USB power means Pi 3 or earlier; ports shown are the Pi 3 B/B+"
+    ports:
+      - {label: USB, end: "usb-a:f", qty: 4, dir: both, signals: [usb.2.0, power.usb]}
+      - {label: HDMI, end: "hdmi:f", dir: out, signals: [video.hdmi]}
+      - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
+      - {label: AV out, end: "trrs-3.5:f", dir: out, signals: [video.composite, audio.analog.stereo], note: "Composite video + audio on one 3.5 mm TRRS jack"}
+      - {label: Power, end: "micro-usb:f", dir: in, volts: 5, signals: [power.usb]}
+      - {label: microSD, end: "microsd:f", dir: both, signals: [storage.card]}
+
+  - id: iphone-5
+    name: "Apple iPhone 5"
+    aliases: [iphone, iphone 5]
+    confirmed: true
+    ports:
+      - {label: Lightning, end: "lightning:f", dir: both, signals: [lightning.data, power.usb, video.hdmi], note: "HDMI out needs the Lightning Digital AV adapter"}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+
+  - id: ipod-2nd-gen
+    name: "Apple iPod (2nd generation)"
+    aliases: [ipod]
+    confirmed: false
+    assumption: "a 30-pin model (nano, touch or classic); the iPod shuffle uses a 3.5 mm dock instead"
+    ports:
+      - {label: Dock, end: "apple-30pin:f", dir: both, signals: [apple30.data, power.usb]}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+
+  - id: nintendo-3ds
+    name: "Nintendo 3DS"
+    aliases: [3ds, nintendo 3ds]
+    confirmed: true
+    ports:
+      - {label: Charge, end: "3ds-dc:f", dir: in, volts: 4.6, signals: [power.dc, power.usb], note: "Also takes the DSi charger"}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+      - {label: SD card, end: "sd:f", dir: both, signals: [storage.card]}
+
+  - id: psp
+    name: "Sony PSP (1000 / 2000 / 3000)"
+    aliases: [psp, playstation portable]
+    confirmed: true
+    ports:
+      - {label: USB, end: "mini-usb:f", dir: both, signals: [usb.2.0, power.usb], note: "Charges over USB on the 2000 and 3000"}
+      - {label: DC in, end: "dc-barrel:f", dir: in, volts: 5, signals: [power.dc, power.usb]}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+      - {label: Memory Stick, end: "memory-stick:f", dir: both, signals: [storage.card]}
+
+  - id: ps2-slim
+    name: "Sony PlayStation 2 (slim)"
+    aliases: [ps2, playstation 2, ps2 slim]
+    confirmed: true
+    ports:
+      - {label: AV Multi Out, end: "ps2-avmulti:f", dir: out, signals: [video.composite, video.s-video, video.component, audio.analog.stereo]}
+      - {label: USB, end: "usb-a:f", qty: 2, dir: both, signals: [usb.2.0, power.usb]}
+      - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
+      - {label: DC in, end: "dc-barrel:f", dir: in, volts: 8.5, signals: [power.dc]}
+
+  - id: crt-tv
+    name: "CRT TV (typical)"
+    aliases: [crt, crt tv, tube tv]
+    confirmed: false
+    assumption: "a typical CRT with composite AV in and an antenna input; your model may also have S-Video, component or audio out"
+    ports:
+      - {label: AV in, end: "rca*3:f", dir: in, signals: [video.composite, audio.analog.stereo]}
+      - {label: Antenna, end: "coax-f:f", dir: in, signals: [rf.antenna]}
+
+  - id: dell-monitor
+    name: "Dell monitor (typical)"
+    aliases: [dell, dell monitor, monitor]
+    confirmed: false
+    assumption: "a typical recent Dell with HDMI and DisplayPort in; check your model's back panel"
+    ports:
+      - {label: HDMI in, end: "hdmi:f", dir: in, signals: [video.hdmi, video.dvi]}
+      - {label: DisplayPort in, end: "displayport:f", dir: in, signals: [video.displayport]}
+      - {label: Power, end: "iec-c13:m", dir: in, signals: [power.ac]}
+
+  - id: apple-tv-hd
+    name: "Apple TV (HD / 4K)"
+    aliases: [apple tv, appletv]
+    confirmed: false
+    assumption: "Apple TV HD or 4K; older models also have optical audio"
+    ports:
+      - {label: HDMI, end: "hdmi:f", dir: out, signals: [video.hdmi]}
+      - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
+      - {label: Power, end: "iec-c7:m", dir: in, signals: [power.ac]}
+
+  - id: camera-mini-usb
+    name: "Camera (mini-USB)"
+    aliases: [mini usb camera]
+    confirmed: false
+    assumption: "a generic camera that charges and transfers over mini-USB"
+    ports:
+      - {label: USB, end: "mini-usb:f", dir: both, signals: [usb.2.0, power.usb]}
+
+  - id: camera-micro-usb
+    name: "Camera (micro-USB)"
+    aliases: [micro usb camera]
+    confirmed: false
+    assumption: "a generic camera that charges and transfers over micro-USB"
+    ports:
+      - {label: USB, end: "micro-usb:f", dir: both, signals: [usb.2.0, power.usb]}
+
+  - id: camera-battery
+    name: "Camera (battery only)"
+    aliases: [battery camera]
+    confirmed: true
+    ports: []
+
+  - id: te-ob-4
+    name: "Teenage Engineering OB-4 speaker"
+    aliases: [ob-4, ob4, teenage engineering speaker]
+    confirmed: false
+    assumption: "the OB-4; other Teenage Engineering speakers differ"
+    ports:
+      - {label: Line in, end: "trs-3.5:f", dir: in, signals: [audio.analog.stereo]}
+      - {label: USB-C, end: "usb-c:f", dir: in, signals: [power.usb, usb.2.0], note: "Charging"}

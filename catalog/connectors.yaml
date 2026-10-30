@@ -1,10 +1,12 @@
 # Connector shapes. IDs are stable forever: library rows reference them.
 # Aliases are what people actually type; matching ignores case, spaces,
-# hyphens and underscores.
+# hyphens and underscores. `mates` lists other connectors this one physically
+# plugs into (a USB 3.0 Type-A plug fits any USB-A socket); signals decide
+# what then works.
 connectors:
   # USB and Apple
   - {id: usb-a, family: usb, name: "USB Type-A", aliases: [usb, usb a, type a, usb 2.0 a]}
-  - {id: usb-a-3.0, family: usb, name: "USB 3.0 Type-A (SuperSpeed, blue)", aliases: [usb 3, usb3, usb 3.0, usbs, usb ss, superspeed]}
+  - {id: usb-a-3.0, family: usb, name: "USB 3.0 Type-A (SuperSpeed, blue)", aliases: [usb 3, usb3, usb 3.0, usbs, usb ss, superspeed], mates: [usb-a]}
   - {id: usb-b, family: usb, name: "USB Type-B (printer)", aliases: [usb b, type b, printer cable]}
   - {id: usb-b-3.0, family: usb, name: "USB 3.0 Type-B", aliases: [usb 3 b, usb3 b]}
   - {id: usb-c, family: usb, name: "USB Type-C", aliases: [usbc, type c, usb c, thunderbolt 3, thunderbolt 4]}
@@ -31,7 +33,7 @@ connectors:
 
   # Audio
   - {id: trs-3.5, family: audio, name: "3.5 mm stereo jack (TRS)", aliases: [aux, 3.5mm, 3.5 mm, headphone jack, mini jack, eighth inch, 1/8 inch]}
-  - {id: trrs-3.5, family: audio, name: "3.5 mm headset / AV jack (TRRS)", aliases: [trrs, headset jack, 4 pole]}
+  - {id: trrs-3.5, family: audio, name: "3.5 mm headset / AV jack (TRRS)", aliases: [trrs, headset jack, 4 pole], mates: [trs-3.5]}
   - {id: trs-6.35, family: audio, name: "6.35 mm jack (1/4 inch)", aliases: [quarter inch, 1/4 inch, 6.35mm, jack]}
   - {id: toslink, family: audio, name: "TOSLINK optical", aliases: [optical, spdif, s/pdif]}
 
