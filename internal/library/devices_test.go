@@ -3,8 +3,8 @@ package library_test
 import (
 	"testing"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func TestAddDeviceFillsPlaceholder(t *testing.T) {

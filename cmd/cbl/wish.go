@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func wishCmd() *cobra.Command {
@@ -45,6 +45,24 @@ func listWishes(cmd *cobra.Command, all bool) error {
 		return err
 	}
 	out := cmd.OutOrStdout()
+	if jsonOut {
+		type wishJSON struct {
+			ID     string `json:"id"`
+			Part   string `json:"part"`
+			Name   string `json:"name"`
+			Qty    int    `json:"qty"`
+			For    string `json:"for,omitempty"`
+			Notes  string `json:"notes,omitempty"`
+			Done   bool   `json:"done"`
+			YouOwn int    `json:"you_own"`
+		}
+		views := []wishJSON{}
+		for _, w := range wishes {
+			views = append(views, wishJSON{w.ID, w.PartKey, st.partName(w.PartKey), w.Qty, w.System, w.Notes, w.Done,
+				len(st.inv.Of(st.c, w.PartKey).Owned[w.PartKey])})
+		}
+		return emit(cmd, views)
+	}
 	if len(wishes) == 0 {
 		fmt.Fprintln(out, "Your wishlist is empty. `cbl connect … --wish` and `cbl system up … --wish` add to it.")
 		return nil
@@ -98,7 +116,7 @@ func wishAddCmd() *cobra.Command {
 					break
 				}
 				if len(cands) > 1 {
-					return unresolved(cmd.ErrOrStderr(), st.c, kind, args, variant, cands)
+					return unresolved(cmd, st.c, kind, args, variant, cands)
 				}
 			}
 			if part == nil {
@@ -114,6 +132,9 @@ func wishAddCmd() *cobra.Command {
 			}
 			if err := st.db.AddWish(part.Key, qty, systemID, notes); err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, map[string]any{"part": viewPart(part), "qty": qty})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "★ Added %d × %s to your wishlist\n", qty, part.Name)
 			return nil
@@ -150,6 +171,9 @@ func wishDoneCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if jsonOut {
+				return emit(cmd, map[string]any{"done": w.ID, "added": viewItems(st.c, added, nil)})
+			}
 			ids := make([]string, len(added))
 			for i, a := range added {
 				ids[i] = "#" + a.ShortID()
@@ -184,6 +208,9 @@ func wishRmCmd() *cobra.Command {
 			}
 			if err := db.RemoveWish(w.ID); err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, map[string]string{"removed": w.ID})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Removed wish %s\n", args[0])
 			return nil

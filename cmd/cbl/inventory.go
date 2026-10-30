@@ -2,15 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func openLibrary() (*library.DB, error) {
@@ -39,7 +38,7 @@ func addCmd(kind catalog.Kind) *cobra.Command {
 			}
 			p, candidates := c.Resolve(kind, args, variant)
 			if p == nil {
-				return unresolved(cmd.ErrOrStderr(), c, kind, args, variant, candidates)
+				return unresolved(cmd, c, kind, args, variant, candidates)
 			}
 			if qty < 1 {
 				return fmt.Errorf("--qty must be at least 1")
@@ -53,6 +52,9 @@ func addCmd(kind catalog.Kind) *cobra.Command {
 			added, err := db.AddItems(it, qty)
 			if err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, map[string]any{"part": viewPart(p), "added": viewItems(c, added, nil)})
 			}
 			ids := make([]string, len(added))
 			for i, a := range added {
@@ -83,8 +85,13 @@ func addCmd(kind catalog.Kind) *cobra.Command {
 }
 
 // unresolved explains why no single catalog type matched and what to try.
-func unresolved(w io.Writer, c *catalog.Catalog, kind catalog.Kind, args []string, variant string, candidates []*catalog.Part) error {
+func unresolved(cmd *cobra.Command, c *catalog.Catalog, kind catalog.Kind, args []string, variant string, candidates []*catalog.Part) error {
+	w := cmd.ErrOrStderr()
 	what := strings.Join(args, " ")
+	if jsonOut && len(candidates) > 0 {
+		emit(cmd, map[string]any{"error": fmt.Sprintf("%q matches %d %s types", what, len(candidates), kind), "candidates": viewParts(candidates)})
+		return errReported
+	}
 	if len(candidates) == 0 {
 		other := catalog.KindAdapter
 		if kind == catalog.KindAdapter {
@@ -170,6 +177,13 @@ func lsCmd(kind catalog.Kind) *cobra.Command {
 			sort.SliceStable(items, func(i, j int) bool { return name(items[i]) < name(items[j]) })
 
 			out := cmd.OutOrStdout()
+			if jsonOut {
+				counts := map[string]int{}
+				for _, it := range items {
+					counts[inv.Status[it.ID].String()]++
+				}
+				return emit(cmd, map[string]any{"items": viewItems(c, items, inv), "counts": counts})
+			}
 			if len(items) == 0 {
 				fmt.Fprintf(out, "No %ss match. Add one with `%s`.\n", kind, addHint(kind))
 				return nil
@@ -254,6 +268,9 @@ func rmCmd(kind catalog.Kind) *cobra.Command {
 			}
 			if err := db.RemoveItem(kind, it.ID); err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, map[string]string{"removed": it.ID})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Removed #%s\n", it.ShortID())
 			return nil

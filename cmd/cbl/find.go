@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
 )
 
 func findCmd() *cobra.Command {
@@ -32,32 +32,53 @@ func findCmd() *cobra.Command {
 			if len(refs) == 0 {
 				return fmt.Errorf("nothing matches %q", q)
 			}
-			printFind(cmd.OutOrStdout(), c, refs)
+			g := groupFind(c, refs)
+			if jsonOut {
+				return emit(cmd, map[string]any{
+					"connectors": g.conns, "cables": viewParts(g.ofKind(catalog.KindCable)),
+					"adapters": viewParts(g.ofKind(catalog.KindAdapter)), "devices": g.devices, "signals": g.signals,
+				})
+			}
+			printFind(cmd.OutOrStdout(), g)
 			return nil
 		},
 	}
 }
 
-// printFind lists matched connectors, then cables and adapters. Connectors
-// that matched exactly (the first refs) also pull in every part with that end,
-// so "cbl find aux" shows every cable with a 3.5 mm plug.
-func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
-	var conns []*catalog.Connector
-	var parts []*catalog.Part
-	var signals []*catalog.Signal
-	var devices []*catalog.DeviceModel
+type findGroups struct {
+	conns   []*catalog.Connector
+	parts   []*catalog.Part
+	signals []*catalog.Signal
+	devices []*catalog.DeviceModel
+}
+
+func (g findGroups) ofKind(k catalog.Kind) []*catalog.Part {
+	out := []*catalog.Part{}
+	for _, p := range g.parts {
+		if p.Kind == k {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// groupFind sorts matches by type. Connectors that matched exactly (the first
+// refs) also pull in every part with that end, so "cbl find aux" shows every
+// cable with a 3.5 mm plug.
+func groupFind(c *catalog.Catalog, refs []catalog.Ref) findGroups {
+	var g findGroups
 	seen := map[string]bool{}
 	addPart := func(p *catalog.Part) {
 		if !seen[p.Key] {
 			seen[p.Key] = true
-			parts = append(parts, p)
+			g.parts = append(g.parts, p)
 		}
 	}
 	for i, r := range refs {
 		switch r.Kind {
 		case catalog.RefConnector:
 			cn := c.Connectors[r.ID]
-			conns = append(conns, cn)
+			g.conns = append(g.conns, cn)
 			if i == 0 {
 				for _, p := range c.ByConnector[cn.ID] {
 					addPart(p)
@@ -67,11 +88,16 @@ func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
 			p, _ := c.Part(r.ID)
 			addPart(p)
 		case catalog.RefSignal:
-			signals = append(signals, c.Signals[r.ID])
+			g.signals = append(g.signals, c.Signals[r.ID])
 		case catalog.RefDevice:
-			devices = append(devices, c.Devices[r.ID])
+			g.devices = append(g.devices, c.Devices[r.ID])
 		}
 	}
+	return g
+}
+
+// printFind lists matched connectors, then cables, adapters, devices and signals.
+func printFind(w io.Writer, g findGroups) {
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	section := func(title string, n int) {
@@ -79,17 +105,12 @@ func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
 			fmt.Fprintf(tw, "%s (%d)\n", title, n)
 		}
 	}
-	section("Connectors", len(conns))
-	for _, cn := range conns {
+	section("Connectors", len(g.conns))
+	for _, cn := range g.conns {
 		fmt.Fprintf(tw, "  %s\t%s\t%s\n", cn.ID, cn.Name, cn.Family)
 	}
 	for _, kind := range []catalog.Kind{catalog.KindCable, catalog.KindAdapter} {
-		var ofKind []*catalog.Part
-		for _, p := range parts {
-			if p.Kind == kind {
-				ofKind = append(ofKind, p)
-			}
-		}
+		ofKind := g.ofKind(kind)
 		title := "Cables"
 		if kind == catalog.KindAdapter {
 			title = "Adapters"
@@ -99,12 +120,12 @@ func printFind(w io.Writer, c *catalog.Catalog, refs []catalog.Ref) {
 			fmt.Fprintf(tw, "  %s\t%s\t%s\n", p.Name, p.Key, partFlags(p))
 		}
 	}
-	section("Devices", len(devices))
-	for _, d := range devices {
+	section("Devices", len(g.devices))
+	for _, d := range g.devices {
 		fmt.Fprintf(tw, "  %s\t%s\t\n", d.Name, d.ID)
 	}
-	section("Signals", len(signals))
-	for _, s := range signals {
+	section("Signals", len(g.signals))
+	for _, s := range g.signals {
 		fmt.Fprintf(tw, "  %s\t%s\t%s\n", s.ID, s.Name, s.Kind)
 	}
 	tw.Flush()

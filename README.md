@@ -4,15 +4,30 @@ Platform that helps people organize and make sense of their cables and wires.
 `cbl` is an offline-first CLI: log the cables and adapters you own, look up
 what a device's ports do, and find out what you're missing to hook things up.
 
-## Build
+## Install
+
+```sh
+go install github.com/sonia-sharapova/cable-clutter/cmd/cbl@latest
+# after the first tagged release:
+brew install sonia-sharapova/tap/cbl
+```
+
+## Develop
 
 Requires Go 1.27+.
 
 ```sh
 go build -o cbl ./cmd/cbl
-go test ./...
-go test -run x -bench . ./internal/catalog   # performance budgets
+go test ./...                                # includes the performance budgets
+go test -v -run TestBudgets ./internal/perf  # print the budget report
+go generate ./...                            # after editing catalog/*.yaml
 ```
+
+The CLI loads `catalog/catalog.bin`, a snapshot compiled from the YAML, so it
+never parses YAML at start-up. A test fails if the snapshot is out of date.
+
+Releases: push a `v*` tag; GoReleaser builds macOS and Linux binaries and
+updates the Homebrew tap (`.goreleaser.yaml`, `.github/workflows/release.yml`).
 
 ## Use
 
@@ -58,13 +73,17 @@ cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals
 cbl doctor                # catalog stats and library location
 cbl find aux --timing     # print load and query times
+cbl ls --json             # any command: one JSON document instead of text
+cbl export -o backup.json # the whole library as JSON
+cbl import backup.json    # into an empty library (--replace to overwrite)
 ```
 
 ## Layout
 
 | Path | What |
 | --- | --- |
-| `catalog/*.yaml` | The bundled catalog: signals, connectors, cable and adapter types. Compiled into the binary. |
+| `catalog/*.yaml` | The bundled catalog: signals, connectors, cable and adapter types, glyphs, devices. |
+| `catalog/catalog.bin` | Snapshot compiled from the YAML by `go generate` (`cmd/catalogc`); embedded in the binary. |
 | `internal/catalog` | Loads and validates the catalog; builds the hashmap indexes and search. |
 | `catalog/glyphs.yaml` | ASCII outline per connector (`#` = contacts: filled on plugs, blank on sockets). |
 | `internal/outline` | Draws a part's ends side by side; golden tests in `testdata/` (`go test ./internal/outline -update` to refresh). |
@@ -72,6 +91,7 @@ cbl find aux --timing     # print load and query times
 | `internal/advise` | Per-port report: what you own that fits, what it lets you do, what to buy for the rest, and power supplies of the wrong voltage. |
 | `internal/plan` | Which item each link uses when a system comes up (pinned, then dedicated, then any spare), and which systems conflict over cables or device ports. |
 | `internal/route` | Dijkstra over (open connector, signal) states: one signal must survive the chain; converters (`in_signals`) change it; one-way parts (`source`) and send-only ports (`out_only`) are respected. |
+| `internal/perf` | Performance budgets as tests, on a 5,000-type catalog and a 500-cable library. |
 | `internal/library` | The user's own data in SQLite (WAL), with numbered migrations. |
 | `cmd/cbl` | The CLI. |
 

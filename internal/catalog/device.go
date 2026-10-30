@@ -7,25 +7,25 @@ import (
 
 // DeviceModel is a kind of device and the ports it has.
 type DeviceModel struct {
-	ID         string
-	Name       string
-	Aliases    []string
-	Confirmed  bool   // false: ports rest on an assumption about the model
-	Assumption string // which assumption, when not confirmed
-	Ports      []Port
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Aliases    []string `json:"aliases,omitempty"`
+	Confirmed  bool     `json:"confirmed"`            // false: ports rest on an assumption about the model
+	Assumption string   `json:"assumption,omitempty"` // which assumption, when not confirmed
+	Ports      []Port   `json:"ports"`
 }
 
 // Port is one connector on a device. End is the device's own connector, so a
 // cable fits when its end has the same connector and the opposite gender.
 type Port struct {
-	Label   string
-	End     End
-	Qty     int    // identical ports of this kind
-	Dir     string // in, out or both
-	Signals []string
-	OutOnly []string // signals that only leave a two-way port
-	Volts   float64  // power inputs only
-	Note    string
+	Label   string   `json:"label"`
+	End     End      `json:"end"`
+	Qty     int      `json:"qty"` // identical ports of this kind
+	Dir     string   `json:"dir"` // in, out or both
+	Signals []string `json:"signals"`
+	OutOnly []string `json:"out_only,omitempty"` // signals that only leave a two-way port
+	Volts   float64  `json:"volts,omitempty"`    // power inputs only
+	Note    string   `json:"note,omitempty"`
 }
 
 // Sends reports whether signal s can leave the port.

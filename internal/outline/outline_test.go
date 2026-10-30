@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	catalogdata "cable-clutter/catalog"
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/outline"
+	catalogdata "github.com/sonia-sharapova/cable-clutter/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/outline"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")

@@ -13,17 +13,17 @@ import (
 )
 
 type Signal struct {
-	ID   string
-	Kind string
-	Name string
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	Name string `json:"name"`
 }
 
 type Connector struct {
-	ID      string
-	Family  string
-	Name    string
-	Aliases []string
-	Mates   []string // other connectors it physically plugs into
+	ID      string   `json:"id"`
+	Family  string   `json:"family"`
+	Name    string   `json:"name"`
+	Aliases []string `json:"aliases,omitempty"`
+	Mates   []string `json:"mates,omitempty"` // other connectors it physically plugs into
 }
 
 type Kind string
@@ -102,21 +102,30 @@ type rawFile struct {
 
 // Load reads every *.yaml file in fsys, validates cross-references and builds
 // the indexes. Any invalid entry fails the whole load, so a bad catalog
-// never ships.
+// never ships. The CLI loads the compiled snapshot instead (LoadCompiled),
+// which skips YAML parsing.
 func Load(fsys fs.FS, version string) (*Catalog, error) {
-	files, err := fs.Glob(fsys, "*.yaml")
+	all, err := parseYAML(fsys)
 	if err != nil {
 		return nil, err
 	}
+	return build(all, version)
+}
+
+func parseYAML(fsys fs.FS) (rawFile, error) {
 	var all rawFile
+	files, err := fs.Glob(fsys, "*.yaml")
+	if err != nil {
+		return all, err
+	}
 	for _, name := range files {
 		data, err := fs.ReadFile(fsys, name)
 		if err != nil {
-			return nil, err
+			return all, err
 		}
 		var f rawFile
 		if err := yaml.Unmarshal(data, &f); err != nil {
-			return nil, fmt.Errorf("%s: %w", path.Base(name), err)
+			return all, fmt.Errorf("%s: %w", path.Base(name), err)
 		}
 		all.Signals = append(all.Signals, f.Signals...)
 		all.Connectors = append(all.Connectors, f.Connectors...)
@@ -130,7 +139,7 @@ func Load(fsys fs.FS, version string) (*Catalog, error) {
 			all.Glyphs[k] = g
 		}
 	}
-	return build(all, version)
+	return all, nil
 }
 
 func build(raw rawFile, version string) (*Catalog, error) {

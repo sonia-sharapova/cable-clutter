@@ -5,10 +5,10 @@ import (
 	"slices"
 	"testing"
 
-	catalogdata "cable-clutter/catalog"
-	"cable-clutter/internal/advise"
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	catalogdata "github.com/sonia-sharapova/cable-clutter/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/advise"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 type fixture struct {

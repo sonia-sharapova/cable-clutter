@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 // Owned is a part type that fits a port, with the items of it you own.

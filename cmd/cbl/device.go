@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/advise"
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/advise"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func deviceCmd() *cobra.Command {
@@ -101,7 +101,11 @@ func showDevice(cmd *cobra.Command, ref string) error {
 	if err != nil {
 		return err
 	}
-	printDevice(cmd.OutOrStdout(), c, model, nickname, advise.Device(c, model, cables, adapters, nickname))
+	reports := advise.Device(c, model, cables, adapters, nickname)
+	if jsonOut {
+		return emit(cmd, deviceJSON(model, nickname, hint, reports))
+	}
+	printDevice(cmd.OutOrStdout(), c, model, nickname, reports)
 	if hint != "" {
 		fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n", hint)
 	}
@@ -194,6 +198,62 @@ func printDevice(w io.Writer, c *catalog.Catalog, m *catalog.DeviceModel, nickna
 	}
 }
 
+type ownedView struct {
+	Part      partView `json:"part"`
+	Items     []string `json:"items"`
+	Free      int      `json:"free"`
+	Dedicated bool     `json:"dedicated,omitempty"`
+}
+
+func viewOwned(os []advise.Owned) []ownedView {
+	out := []ownedView{}
+	for _, o := range os {
+		v := ownedView{Part: viewPart(o.Fit.Part), Free: o.Free, Dedicated: o.Dedicated}
+		for _, it := range o.Items {
+			v.Items = append(v.Items, it.ID)
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+func deviceJSON(m *catalog.DeviceModel, nickname, hint string, reports []advise.PortReport) map[string]any {
+	type suggestion struct {
+		Part    partView `json:"part"`
+		Signals []string `json:"signals"`
+	}
+	type portView struct {
+		catalog.Port
+		Can     []string     `json:"can"`
+		Have    []ownedView  `json:"have"`
+		CantYet []suggestion `json:"cant_yet"`
+		Wrong   []ownedView  `json:"wrong_voltage"`
+		Unsure  []ownedView  `json:"unknown_voltage"`
+	}
+	ports := []portView{}
+	for _, r := range reports {
+		pv := portView{Port: r.Port, Can: r.Can, Have: viewOwned(r.Have), Wrong: viewOwned(r.Wrong), Unsure: viewOwned(r.Unsure), CantYet: []suggestion{}}
+		if pv.Can == nil {
+			pv.Can = []string{}
+		}
+		for _, s := range r.CantYet {
+			pv.CantYet = append(pv.CantYet, suggestion{viewPart(s.Part), s.Signals})
+		}
+		ports = append(ports, pv)
+	}
+	out := map[string]any{"model": m.ID, "name": m.Name, "confirmed": m.Confirmed, "ports": ports}
+	if !m.Confirmed {
+		out["assumption"] = m.Assumption
+	}
+	if nickname != "" {
+		out["nickname"] = nickname
+	}
+	if hint != "" {
+		out["hint"] = hint
+	}
+	return out
+}
+
 func shortConnector(c *catalog.Catalog, id string) string {
 	cn, ok := c.Connectors[id]
 	if !ok {
@@ -233,6 +293,9 @@ func deviceAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if jsonOut {
+				return emit(cmd, map[string]any{"id": d.ID, "short_id": d.ShortID(), "nickname": d.Nickname, "model": m.ID, "created": created})
+			}
 			verb := "Added"
 			if !created {
 				verb = "Set the model of"
@@ -269,6 +332,22 @@ func deviceLsCmd() *cobra.Command {
 				return err
 			}
 			out := cmd.OutOrStdout()
+			if jsonOut {
+				type deviceView struct {
+					ID        string `json:"id"`
+					ShortID   string `json:"short_id"`
+					Nickname  string `json:"nickname"`
+					Model     string `json:"model,omitempty"`
+					Confirmed bool   `json:"confirmed"`
+					Notes     string `json:"notes,omitempty"`
+				}
+				views := []deviceView{}
+				for _, d := range devices {
+					m, ok := c.Devices[d.Model]
+					views = append(views, deviceView{d.ID, d.ShortID(), d.Nickname, d.Model, ok && m.Confirmed, d.Notes})
+				}
+				return emit(cmd, views)
+			}
 			if len(devices) == 0 {
 				fmt.Fprintln(out, "No devices yet. Add one with `cbl device add <model> --name <name>`.")
 				return nil
@@ -317,6 +396,9 @@ func deviceRmCmd() *cobra.Command {
 			}
 			if err := db.RemoveDevice(found[0].ID); err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, map[string]string{"removed": found[0].ID})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Removed %q\n", found[0].Nickname)
 			return nil

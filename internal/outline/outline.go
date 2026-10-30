@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"strings"
 
-	"cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
 )
 
 const wireLen = 14

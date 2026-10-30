@@ -1,4 +1,4 @@
-module cable-clutter
+module github.com/sonia-sharapova/cable-clutter
 
 go 1.27.3
 

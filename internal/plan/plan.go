@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 // Pick is the item chosen for one link.
@@ -200,8 +200,8 @@ func clash(a, b map[string]int, have func(string) int) (shortfall, bool) {
 
 // PortClash is a device port this system needs that active systems fill.
 type PortClash struct {
-	Port   string // "device · port"
-	HeldBy []string
+	Port   string   `json:"port"` // "device · port"
+	HeldBy []string `json:"held_by"`
 }
 
 // BusyPorts lists the ports system s would need that active systems already
@@ -233,9 +233,9 @@ func BusyPorts(ports Ports, s *library.System, systems []*library.System, links 
 
 // Missing is a part type a system needs more of than you own at all.
 type Missing struct {
-	PartKey string
-	Need    int
-	Owned   int
+	PartKey string `json:"part"`
+	Need    int    `json:"need"`
+	Owned   int    `json:"owned"`
 }
 
 // Short lists what a system can never come up without buying.

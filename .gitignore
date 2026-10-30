@@ -1,0 +1,5 @@
+# Build and test output
+/cbl
+*.test
+*.out
+/dist/

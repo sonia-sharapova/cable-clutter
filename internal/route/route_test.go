@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	catalogdata "cable-clutter/catalog"
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
-	"cable-clutter/internal/plan"
-	"cable-clutter/internal/route"
+	catalogdata "github.com/sonia-sharapova/cable-clutter/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/plan"
+	"github.com/sonia-sharapova/cable-clutter/internal/route"
 )
 
 type fixture struct {

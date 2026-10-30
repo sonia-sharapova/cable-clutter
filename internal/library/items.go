@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
 )
 
 // Item is one physical cable or adapter the user owns.

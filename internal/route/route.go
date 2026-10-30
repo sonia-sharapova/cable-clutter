@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
-	"cable-clutter/internal/plan"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/plan"
 )
 
 // Step costs. Owning beats buying by a wide margin, so a route you can build

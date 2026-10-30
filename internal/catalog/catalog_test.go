@@ -7,8 +7,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	catalogdata "cable-clutter/catalog"
-	"cable-clutter/internal/catalog"
+	catalogdata "github.com/sonia-sharapova/cable-clutter/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
 )
 
 func load(t testing.TB) *catalog.Catalog {

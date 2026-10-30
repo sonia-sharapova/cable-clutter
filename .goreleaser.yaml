@@ -1,0 +1,35 @@
+# Release config: `git tag v0.1.0 && git push --tags` runs it in GitHub
+# Actions (.github/workflows/release.yml).
+version: 2
+
+before:
+  hooks:
+    - go generate ./...
+
+builds:
+  - main: ./cmd/cbl
+    binary: cbl
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+
+archives:
+  - formats: [tar.gz]
+
+checksum:
+  name_template: checksums.txt
+
+brews:
+  - name: cbl
+    repository:
+      owner: sonia-sharapova
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/sonia-sharapova/cable-clutter
+    description: "Know your cables: inventory, device ports, and what you need to hook things up"
+    license: ""
+    install: |
+      bin.install "cbl"
+    test: |
+      system "#{bin}/cbl", "--version"

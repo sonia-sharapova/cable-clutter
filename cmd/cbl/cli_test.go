@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -15,6 +17,9 @@ func run(t *testing.T, args ...string) (string, error) {
 	root.SetErr(&out)
 	root.SetArgs(args)
 	err := root.Execute()
+	if err != nil {
+		reportError(&out, &out, err)
+	}
 	return out.String(), err
 }
 
@@ -251,4 +256,92 @@ func TestConnectAndWish(t *testing.T) {
 	if _, err := run(t, "connect", "pi", "toaster"); err == nil {
 		t.Error("connect to an unknown device succeeded")
 	}
+}
+
+// Every command prints exactly one JSON document under --json, failures too.
+func TestJSON(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	decode := func(args ...string) map[string]any {
+		t.Helper()
+		out, _ := run(t, append(args, "--json")...)
+		dec := json.NewDecoder(strings.NewReader(out))
+		var v any
+		if err := dec.Decode(&v); err != nil {
+			t.Fatalf("cbl %s --json: not JSON (%v):\n%s", strings.Join(args, " "), err, out)
+		}
+		if dec.More() {
+			t.Fatalf("cbl %s --json: more than one document:\n%s", strings.Join(args, " "), out)
+		}
+		if m, ok := v.(map[string]any); ok {
+			return m
+		}
+		return map[string]any{"list": v}
+	}
+
+	added := decode("add", "hdmi", "hdmi", "--name", "grey")
+	if items := added["added"].([]any); len(items) != 1 || items[0].(map[string]any)["status"] != "free" {
+		t.Errorf("add: %v", added)
+	}
+	decode("device", "add", "mac-mini-m2-2023", "--name", "Mac")
+	decode("device", "add", "apple-tv-hd", "--name", "ATV")
+	decode("system", "new", "Desk")
+	decode("system", "new", "Lounge")
+	decode("system", "add-link", "Desk", "grey", "--from", "Mac")
+	decode("system", "add-link", "Lounge", "hdmi", "hdmi", "--from", "ATV")
+	if up := decode("system", "up", "Desk"); up["up"] != true {
+		t.Errorf("up: %v", up)
+	}
+	conflict := decode("system", "up", "Lounge")
+	if conflict["error"] == nil || len(conflict["shortages"].([]any)) != 1 {
+		t.Errorf("conflict: %v", conflict)
+	}
+	if ls := decode("ls"); ls["counts"].(map[string]any)["in use"] != 1.0 {
+		t.Errorf("ls: %v", ls)
+	}
+	dev := decode("device", "Mac")
+	if dev["model"] != "mac-mini-m2-2023" || len(dev["ports"].([]any)) != 6 {
+		t.Errorf("device: %v", dev)
+	}
+	conn := decode("connect", "mac", "atv")
+	if _, ok := conn["routes"]; !ok {
+		t.Errorf("connect: %v", conn)
+	}
+	for _, args := range [][]string{
+		{"find", "aux"}, {"show", "grey"}, {"show", "usb-a", "usb-c"}, {"catalog", "devices"}, {"doctor"},
+		{"adapter", "ls"}, {"device", "ls"}, {"system", "ls"}, {"system", "show", "Desk"}, {"wish"},
+		{"wish", "add", "aux", "rca"}, {"wish", "done", "1"}, {"system", "down", "Desk"},
+	} {
+		decode(args...)
+	}
+	if e := decode("add", "toaster", "usb-c"); e["error"] == nil {
+		t.Errorf("error not reported as JSON: %v", e)
+	}
+	if e := decode("add", "2-prong", "barrel"); e["candidates"] == nil {
+		t.Errorf("ambiguity should list candidates: %v", e)
+	}
+}
+
+func TestExportImport(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CBL_HOME", home)
+	mustRun(t, "add", "usb-a", "usb-c", "--qty", "3")
+	mustRun(t, "device", "add", "ps2", "--name", "PS2")
+	file := filepath.Join(home, "backup.json")
+	out := mustRun(t, "export", "-o", file)
+	if !strings.Contains(out, "3 cables") || !strings.Contains(out, "1 devices") {
+		t.Errorf("export: %s", out)
+	}
+
+	t.Setenv("CBL_HOME", t.TempDir()) // a fresh library
+	out = mustRun(t, "import", file)
+	if !strings.Contains(out, "3 cables") {
+		t.Errorf("import: %s", out)
+	}
+	if out := mustRun(t, "ls"); !strings.Contains(out, "3 cables: 3 free") {
+		t.Errorf("after import:\n%s", out)
+	}
+	if _, err := run(t, "import", file); err == nil {
+		t.Error("imported over a non-empty library")
+	}
+	mustRun(t, "import", file, "--replace")
 }

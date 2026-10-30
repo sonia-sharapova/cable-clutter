@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func TestOpenMigratesAndIsIdempotent(t *testing.T) {

@@ -37,6 +37,9 @@ func ParseEnd(s string) (End, error) {
 	return e, nil
 }
 
+// MarshalText writes an end in its "connector[*count]:gender" form.
+func (e End) MarshalText() ([]byte, error) { return []byte(e.String()), nil }
+
 func (e End) String() string {
 	if e.Count > 1 {
 		return fmt.Sprintf("%s*%d:%s", e.Connector, e.Count, e.Gender)

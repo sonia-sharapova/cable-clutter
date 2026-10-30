@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func catalogCmd() *cobra.Command {
@@ -25,6 +25,20 @@ func catalogCmd() *cobra.Command {
 			what := "connectors"
 			if len(args) == 1 {
 				what = args[0]
+			}
+			if jsonOut {
+				switch what {
+				case "connectors":
+					return emit(cmd, sortedValues(c.Connectors))
+				case "cables":
+					return emit(cmd, viewParts(sortedValues(c.Cables)))
+				case "adapters":
+					return emit(cmd, viewParts(sortedValues(c.Adapters)))
+				case "signals":
+					return emit(cmd, sortedValues(c.Signals))
+				case "devices":
+					return emit(cmd, c.DeviceModels())
+				}
 			}
 			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 			defer tw.Flush()
@@ -64,6 +78,14 @@ func catalogCmd() *cobra.Command {
 	}
 }
 
+func sortedValues[V any](m map[string]V) []V {
+	out := make([]V, 0, len(m))
+	for _, k := range sortedKeys(m) {
+		out = append(out, m[k])
+	}
+	return out
+}
+
 func sortedKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -84,9 +106,6 @@ func doctorCmd() *cobra.Command {
 				return err
 			}
 			loadTime := time.Since(start)
-			fmt.Fprintf(cmd.OutOrStdout(), "catalog   v%s: %d connectors, %d cables, %d adapters, %d signals (loaded in %s)\n",
-				c.Version, len(c.Connectors), len(c.Cables), len(c.Adapters), len(c.Signals), loadTime.Round(time.Microsecond))
-
 			path, err := library.DefaultPath()
 			if err != nil {
 				return err
@@ -100,6 +119,17 @@ func doctorCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if jsonOut {
+				return emit(cmd, map[string]any{
+					"catalog_version": c.Version, "connectors": len(c.Connectors), "cables": len(c.Cables),
+					"adapters": len(c.Adapters), "signals": len(c.Signals), "devices": len(c.Devices),
+					"catalog_load_ms": float64(loadTime.Microseconds()) / 1000,
+					"library_path":    db.Path, "schema_version": v, "schema_latest": library.LatestVersion(),
+				})
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "catalog   v%s: %d connectors, %d cables, %d adapters, %d signals (loaded in %s)\n",
+				c.Version, len(c.Connectors), len(c.Cables), len(c.Adapters), len(c.Signals), loadTime.Round(time.Microsecond))
+
 			fmt.Fprintf(cmd.OutOrStdout(), "library   %s (schema v%d of %d)\n", db.Path, v, library.LatestVersion())
 			return nil
 		},

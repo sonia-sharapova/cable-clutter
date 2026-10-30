@@ -3,7 +3,7 @@ package catalog_test
 import (
 	"testing"
 
-	"cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
 )
 
 func TestResolve(t *testing.T) {

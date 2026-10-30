@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
-	"cable-clutter/internal/plan"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/plan"
 )
 
 func systemCmd() *cobra.Command {
@@ -112,6 +112,9 @@ func systemNewCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if jsonOut {
+				return emit(cmd, map[string]string{"id": s.ID, "name": s.Name})
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Created %q. Add cables with `cbl system add-link %q <cable> --from <device>[:port] --to <device>[:port]`.\n", s.Name, s.Name)
 			return nil
 		},
@@ -150,8 +153,12 @@ and only one port fits, it is filled in.`,
 			if l.ToDevice, l.ToPort, err = st.endpoint(to, l.PartKey); err != nil {
 				return err
 			}
-			if _, err := st.db.AddLink(l); err != nil {
+			added, err := st.db.AddLink(l)
+			if err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, linkView(added))
 			}
 			out := cmd.OutOrStdout()
 			what := st.partName(l.PartKey)
@@ -199,7 +206,7 @@ func (st *state) resolvePart(cmd *cobra.Command, args []string, variant string) 
 			return p.Key, "", nil
 		}
 		if len(cands) > 1 {
-			return "", "", unresolved(cmd.ErrOrStderr(), st.c, kind, args, variant, cands)
+			return "", "", unresolved(cmd, st.c, kind, args, variant, cands)
 		}
 	}
 	return "", "", fmt.Errorf("no item or type called %q; see `cbl ls` or `cbl find`", ref)
@@ -295,6 +302,9 @@ func systemUnlinkCmd() *cobra.Command {
 			if err := st.db.RemoveLink(links[n-1].ID); err != nil {
 				return err
 			}
+			if jsonOut {
+				return emit(cmd, map[string]string{"removed": links[n-1].ID})
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Removed link %d (%s) from %q\n", n, st.partName(links[n-1].PartKey), s.Name)
 			return nil
 		},
@@ -317,12 +327,15 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 				return err
 			}
 			defer st.db.Close()
-			out := cmd.OutOrStdout()
+			out := textOut(cmd)
 			s, err := st.system(strings.Join(args, " "))
 			if err != nil {
 				return err
 			}
 			if s.Active {
+				if jsonOut {
+					return emit(cmd, map[string]any{"system": s.Name, "up": true, "already": true})
+				}
 				fmt.Fprintf(out, "%q is already up.\n", s.Name)
 				return nil
 			}
@@ -333,6 +346,7 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 
 			// Owning too few at all: only buying fixes it.
 			if missing := plan.Short(st.c, links, st.inv); len(missing) > 0 {
+				var wished []string
 				for _, m := range missing {
 					fmt.Fprintf(out, "%q needs %d × %s; you own %d.\n", s.Name, m.Need, st.partName(m.PartKey), m.Owned)
 					if wish {
@@ -340,17 +354,24 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 							return err
 						}
 						fmt.Fprintf(out, "  ★ Added %d × %s to your wishlist.\n", m.Need-m.Owned, st.partName(m.PartKey))
+						wished = append(wished, m.PartKey)
 					}
 				}
 				if !wish {
 					fmt.Fprintf(out, "  cbl system up %q --wish   add what's missing to your wishlist\n", s.Name)
 				}
-				return fmt.Errorf("%q can't come up until you have them", s.Name)
+				err := fmt.Errorf("%q can't come up until you have them", s.Name)
+				if jsonOut {
+					emit(cmd, map[string]any{"error": err.Error(), "missing": missing, "wished": wished})
+					return errReported
+				}
+				return err
 			}
 
 			ports := plan.NewPorts(st.c, st.devices)
 			picks, short := plan.Allocate(st.c, links, st.inv)
 			busy := plan.BusyPorts(ports, s, st.systems, st.links)
+			tookDown := []string{}
 			if (len(short) > 0 || len(busy) > 0) && switchOver {
 				holders := map[string]bool{}
 				for _, sh := range short {
@@ -369,6 +390,7 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 							return err
 						}
 						fmt.Fprintf(out, "Took %q down.\n", other.Name)
+						tookDown = append(tookDown, other.Name)
 					}
 				}
 				if err := st.reload(); err != nil {
@@ -378,7 +400,7 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 				busy = plan.BusyPorts(ports, s, st.systems, st.links)
 			}
 			if len(short) > 0 || len(busy) > 0 {
-				return conflict(out, st, s, short, busy, wish)
+				return conflict(cmd, out, st, s, short, busy, wish)
 			}
 
 			assigned := map[string]string{}
@@ -388,14 +410,28 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 			if err := st.db.BringUp(s.ID, assigned); err != nil {
 				return err
 			}
+			type useView struct {
+				Link      string `json:"link"`
+				Item      string `json:"item"`
+				Part      string `json:"part"`
+				InsteadOf string `json:"instead_of,omitempty"`
+				BusyIn    string `json:"busy_in,omitempty"`
+			}
+			uses := []useView{}
 			fmt.Fprintf(out, "%q is up. In use now:\n", s.Name)
 			for _, p := range picks {
+				u := useView{Link: p.Link.ID, Item: p.Item.ID, Part: p.Link.PartKey}
 				line := fmt.Sprintf("  ✓ %s #%s", st.partName(p.Link.PartKey), p.Item.ShortID())
 				if p.Swapped {
 					pinned := st.item(p.Link.Preferred)
-					line += fmt.Sprintf("  (instead of #%s, busy in %q)", pinned.ShortID(), st.inv.Of(st.c, p.Link.PartKey).HeldBy[pinned.ID])
+					u.InsteadOf, u.BusyIn = pinned.ID, st.inv.Of(st.c, p.Link.PartKey).HeldBy[pinned.ID]
+					line += fmt.Sprintf("  (instead of #%s, busy in %q)", pinned.ShortID(), u.BusyIn)
 				}
 				fmt.Fprintln(out, line)
+				uses = append(uses, u)
+			}
+			if jsonOut {
+				return emit(cmd, map[string]any{"system": s.Name, "up": true, "took_down": tookDown, "in_use": uses})
 			}
 			return nil
 		},
@@ -406,7 +442,15 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 }
 
 // conflict explains why a system can't come up and what to do about it.
-func conflict(w io.Writer, st *state, s *library.System, short []plan.Shortage, busy []plan.PortClash, wish bool) error {
+func conflict(cmd *cobra.Command, w io.Writer, st *state, s *library.System, short []plan.Shortage, busy []plan.PortClash, wish bool) error {
+	type shortView struct {
+		Link   string   `json:"link"`
+		Part   string   `json:"part"`
+		Owned  int      `json:"owned"`
+		HeldBy []string `json:"held_by"`
+	}
+	shorts := []shortView{}
+	wished := []string{}
 	holders := map[string]bool{}
 	for _, b := range busy {
 		fmt.Fprintf(w, "%s is taken by %s.\n", b.Port, quoteAll(b.HeldBy))
@@ -421,6 +465,7 @@ func conflict(w io.Writer, st *state, s *library.System, short []plan.Shortage, 
 		fmt.Fprintf(w, "No free %s for %s → %s: you own %d, in use by %s.\n", st.partName(sh.Link.PartKey),
 			endpointText(sh.Link.FromDevice, sh.Link.FromPort), endpointText(sh.Link.ToDevice, sh.Link.ToPort),
 			sh.Owned, quoteAll(sh.HeldBy))
+		shorts = append(shorts, shortView{sh.Link.ID, sh.Link.PartKey, sh.Owned, sh.HeldBy})
 		for _, h := range sh.HeldBy {
 			holders[h] = true
 		}
@@ -429,6 +474,7 @@ func conflict(w io.Writer, st *state, s *library.System, short []plan.Shortage, 
 				return err
 			}
 			fmt.Fprintf(w, "  ★ Added 1 × %s to your wishlist.\n", st.partName(sh.Link.PartKey))
+			wished = append(wished, sh.Link.PartKey)
 		}
 	}
 	if !wish {
@@ -444,7 +490,12 @@ func conflict(w io.Writer, st *state, s *library.System, short []plan.Shortage, 
 			fmt.Fprintln(w, "  cbl add …                    if you have another one, log it and retry")
 		}
 	}
-	return fmt.Errorf("%q is still down", s.Name)
+	err := fmt.Errorf("%q is still down", s.Name)
+	if jsonOut {
+		emit(cmd, map[string]any{"error": err.Error(), "shortages": shorts, "busy_ports": busy, "wished": wished})
+		return errReported
+	}
+	return err
 }
 
 func quoteAll(names []string) string {
@@ -472,18 +523,25 @@ func systemDownCmd() *cobra.Command {
 			}
 			out := cmd.OutOrStdout()
 			if !s.Active {
+				if jsonOut {
+					return emit(cmd, map[string]any{"system": s.Name, "up": false, "freed": []string{}})
+				}
 				fmt.Fprintf(out, "%q is already down.\n", s.Name)
 				return nil
 			}
 			if err := st.db.TakeDown(s.ID); err != nil {
 				return err
 			}
-			n := 0
+			freed := []string{}
 			for _, l := range st.links[s.ID] {
 				if l.Assigned != "" {
-					n++
+					freed = append(freed, l.Assigned)
 				}
 			}
+			if jsonOut {
+				return emit(cmd, map[string]any{"system": s.Name, "up": false, "freed": freed})
+			}
+			n := len(freed)
 			fmt.Fprintf(out, "%q is down; %d cables and adapters are back.\n", s.Name, n)
 			return nil
 		},
@@ -502,6 +560,14 @@ func systemLsCmd() *cobra.Command {
 			}
 			defer st.db.Close()
 			out := cmd.OutOrStdout()
+			if jsonOut {
+				conflicts := plan.Conflicts(st.c, plan.NewPorts(st.c, st.devices), st.systems, st.links, st.inv)
+				views := []map[string]any{}
+				for _, s := range st.systems {
+					views = append(views, systemView(st, s, conflicts[s.ID]))
+				}
+				return emit(cmd, views)
+			}
 			if len(st.systems) == 0 {
 				fmt.Fprintln(out, "No systems yet. Create one with `cbl system new <name>`.")
 				return nil
@@ -548,6 +614,9 @@ func systemShowCmd() *cobra.Command {
 				return err
 			}
 			out := cmd.OutOrStdout()
+			if jsonOut {
+				return emit(cmd, systemView(st, s, plan.Conflicts(st.c, plan.NewPorts(st.c, st.devices), st.systems, st.links, st.inv)[s.ID]))
+			}
 			status := "down"
 			if s.Active {
 				status = "UP"
@@ -615,6 +684,44 @@ func systemShowCmd() *cobra.Command {
 	}
 }
 
+type linkJSON struct {
+	ID         string `json:"id"`
+	Part       string `json:"part"`
+	Preferred  string `json:"preferred,omitempty"`
+	Assigned   string `json:"assigned,omitempty"`
+	FromDevice string `json:"from_device,omitempty"`
+	FromPort   string `json:"from_port,omitempty"`
+	ToDevice   string `json:"to_device,omitempty"`
+	ToPort     string `json:"to_port,omitempty"`
+}
+
+func linkView(l *library.Link) linkJSON {
+	return linkJSON{l.ID, l.PartKey, l.Preferred, l.Assigned, l.FromDevice, l.FromPort, l.ToDevice, l.ToPort}
+}
+
+func systemView(st *state, s *library.System, conflicts []plan.Conflict) map[string]any {
+	links := []linkJSON{}
+	for _, l := range st.links[s.ID] {
+		links = append(links, linkView(l))
+	}
+	type conflictJSON struct {
+		With string `json:"with"`
+		Part string `json:"part,omitempty"`
+		Port string `json:"port,omitempty"`
+		Need int    `json:"need"`
+		Have int    `json:"have"`
+	}
+	cs := []conflictJSON{}
+	for _, c := range conflicts {
+		cs = append(cs, conflictJSON{c.Other.Name, c.PartKey, c.Port, c.Need, c.Have})
+	}
+	missing := plan.Short(st.c, st.links[s.ID], st.inv)
+	if missing == nil {
+		missing = []plan.Missing{}
+	}
+	return map[string]any{"id": s.ID, "name": s.Name, "up": s.Active, "notes": s.Notes, "links": links, "conflicts": cs, "missing": missing}
+}
+
 func systemRmCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rm <system>",
@@ -632,6 +739,9 @@ func systemRmCmd() *cobra.Command {
 			}
 			if err := st.db.RemoveSystem(s); err != nil {
 				return err
+			}
+			if jsonOut {
+				return emit(cmd, map[string]string{"removed": s.ID})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Deleted %q\n", s.Name)
 			return nil

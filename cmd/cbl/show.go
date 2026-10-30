@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
-	"cable-clutter/internal/outline"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/outline"
 )
 
 func showCmd() *cobra.Command {
@@ -56,6 +56,9 @@ func showCmd() *cobra.Command {
 				if !ok {
 					return fmt.Errorf("#%s is a %s the catalog no longer knows", found[0].ShortID(), found[0].PartKey)
 				}
+				if jsonOut {
+					return emit(cmd, map[string]any{"part": viewPart(p), "items": viewItems(c, found, inv), "outline": outline.Render(c, p, "")})
+				}
 				showItems(out, c, p, found, inv)
 				return nil
 			}
@@ -64,12 +67,21 @@ func showCmd() *cobra.Command {
 			for _, kind := range []catalog.Kind{catalog.KindCable, catalog.KindAdapter} {
 				p, cands := c.Resolve(kind, args, "")
 				if p == nil && len(cands) > 1 {
-					return unresolved(cmd.ErrOrStderr(), c, kind, args, "", cands)
+					return unresolved(cmd, c, kind, args, "", cands)
 				}
 				if p != nil {
 					inv, err := db.LoadInventory(kind)
 					if err != nil {
 						return err
+					}
+					if jsonOut {
+						free := 0
+						for _, it := range inv.Owned[p.Key] {
+							if inv.Status[it.ID] == library.Free {
+								free++
+							}
+						}
+						return emit(cmd, map[string]any{"part": viewPart(p), "owned": len(inv.Owned[p.Key]), "free": free, "outline": outline.Render(c, p, "")})
 					}
 					showType(out, c, p, inv)
 					return nil

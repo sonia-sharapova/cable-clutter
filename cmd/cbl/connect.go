@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/route"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/route"
 )
 
 func connectCmd() *cobra.Command {
@@ -52,12 +52,12 @@ wishlist.`,
 					routes, aName, bName = rev, bName, aName
 				}
 			}
-			out := cmd.OutOrStdout()
+			out := textOut(cmd)
 			if len(routes) == 0 {
 				return fmt.Errorf("no way to connect %s and %s within %d cables and adapters%s",
 					aName, bName, max(maxSteps, 1), map[bool]string{true: " you own", false: ""}[ownedOnly])
 			}
-			return printRoutes(out, st, aName, bName, routes, wish)
+			return printRoutes(out, cmd.OutOrStdout(), st, aName, bName, routes, wish)
 		},
 	}
 	cmd.Flags().BoolVar(&wish, "wish", false, "add the parts you'd need to buy to your wishlist")
@@ -68,7 +68,41 @@ wishlist.`,
 
 var kindOrder = []string{"video", "audio", "data"}
 
-func printRoutes(w io.Writer, st *state, aName, bName string, routes map[string]*route.Route, wish bool) error {
+// printRoutes writes the routes as text to w, or as JSON to jsonW under --json.
+func printRoutes(w, jsonW io.Writer, st *state, aName, bName string, routes map[string]*route.Route, wish bool) error {
+	type stepJSON struct {
+		Part   partView `json:"part"`
+		In     string   `json:"in"`
+		Out    string   `json:"out"`
+		Item   string   `json:"item,omitempty"`
+		BusyIn string   `json:"busy_in,omitempty"`
+		Buy    bool     `json:"buy,omitempty"`
+	}
+	type routeJSON struct {
+		Signal string     `json:"signal"`
+		From   string     `json:"from_port"`
+		To     string     `json:"to_port"`
+		Cost   int        `json:"cost"`
+		Steps  []stepJSON `json:"steps"`
+	}
+	result := map[string]routeJSON{}
+	for kind, r := range routes {
+		rj := routeJSON{Signal: r.Signal, From: r.From.Label, To: r.To.Label, Cost: r.Cost}
+		for _, s := range r.Steps {
+			sj := stepJSON{Part: viewPart(s.Part), In: s.In.String(), Out: s.Out.String(), BusyIn: s.Busy, Buy: s.Item == nil}
+			if s.Item != nil {
+				sj.Item = s.Item.ID
+			}
+			rj.Steps = append(rj.Steps, sj)
+		}
+		result[kind] = rj
+	}
+	toBuy, wished := []string{}, []string{}
+	defer func() {
+		if jsonOut {
+			writeJSON(jsonW, map[string]any{"from": aName, "to": bName, "routes": result, "to_buy": toBuy, "wished": wished})
+		}
+	}()
 	fmt.Fprintf(w, "%s → %s\n", aName, bName)
 	var shown []*route.Route
 	shownKind := map[*route.Route]string{}
@@ -121,6 +155,7 @@ func printRoutes(w io.Writer, st *state, aName, bName string, routes map[string]
 		return nil
 	}
 	fmt.Fprintln(w)
+	toBuy = buyOrder
 	for _, key := range buyOrder {
 		p := buy[key]
 		if !wish {
@@ -137,6 +172,7 @@ func printRoutes(w io.Writer, st *state, aName, bName string, routes map[string]
 			return err
 		}
 		fmt.Fprintf(w, "★ Added to your wishlist: %s\n", p.Name)
+		wished = append(wished, key)
 	}
 	if !wish {
 		fmt.Fprintln(w, "Add these to your wishlist with --wish.")

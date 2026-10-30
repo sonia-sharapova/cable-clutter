@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func open(t *testing.T) *library.DB {

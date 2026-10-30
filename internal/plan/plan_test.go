@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	catalogdata "cable-clutter/catalog"
-	"cable-clutter/internal/catalog"
-	"cable-clutter/internal/library"
-	"cable-clutter/internal/plan"
+	catalogdata "github.com/sonia-sharapova/cable-clutter/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/catalog"
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
+	"github.com/sonia-sharapova/cable-clutter/internal/plan"
 )
 
 const hdmi = "hdmi:m|hdmi:m"
