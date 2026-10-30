@@ -127,6 +127,13 @@ devices:
       - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
       - {label: Power, end: "iec-c7:m", dir: in, signals: [power.ac]}
 
+  - id: sata-drive-2.5
+    name: "SATA hard drive / SSD (2.5-inch)"
+    aliases: [sata drive, ssd, hard drive, hdd, sata ssd, laptop drive]
+    confirmed: true
+    ports:
+      - {label: SATA, end: "sata:m", dir: both, signals: [storage.sata], note: "Data and power share one L-shaped connector; a USB adapter supplies both"}
+
   - id: camera-mini-usb
     name: "Camera (mini-USB)"
     aliases: [mini usb camera]

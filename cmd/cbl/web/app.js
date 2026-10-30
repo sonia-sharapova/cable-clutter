@@ -46,8 +46,18 @@ async function api(path, body) {
 }
 
 const shortId = (id) => id.replaceAll("-", "").slice(26);
+// What each status means, in the words the page shows and on hover.
+const STATUS = {
+  free: ["available", "Not used by any setup that's switched on: you can use it"],
+  reserved: ["reserved", "Pinned to a setup that's switched off: free now, but that setup expects it"],
+  "in use": ["in use", "Plugged into a setup that's switched on"],
+  up: ["on", "This setup is switched on: its cables are in use"],
+  down: ["off", "This setup is switched off"],
+};
+const ID_HINT = "Your item's ID: tells identical cables apart. Use it in commands, e.g. cbl show ";
 const statusClass = (s) => (s || "").replace(" ", "");
-const statusTag = (s) => el("span", { class: "status " + statusClass(s) }, s);
+const statusTag = (s) => el("span", { class: "status " + statusClass(s), title: (STATUS[s] || [])[1] }, (STATUS[s] || [s])[0]);
+const idTag = (id) => el("span", { class: "meta", title: ID_HINT + shortId(id) }, "your #" + shortId(id));
 
 // --- the index -------------------------------------------------------------
 
@@ -181,9 +191,9 @@ async function showPart(key) {
     p.note ? el("p", { class: "note" }, p.note) : null,
     d.items.length
       ? el("table", {},
-          el("tr", {}, ["id", "status", "name", "where", "for"].map((h) => el("th", {}, h))),
+          el("tr", {}, ["your id", "status", "name", "where", "for"].map((h) => el("th", {}, h))),
           d.items.map((it) => el("tr", {},
-            el("td", { class: "meta" }, "#" + it.short_id),
+            el("td", { class: "meta", title: ID_HINT + it.short_id }, "#" + it.short_id),
             el("td", {}, statusTag(it.status), it.held_by ? el("span", { class: "meta" }, " " + it.held_by) : null),
             el("td", {}, it.nickname || ""), el("td", {}, it.location || ""), el("td", {}, it.for || ""))))
       : el("p", { class: "meta" }, "You don't own one. ", el("code", {}, `cbl wish add "${p.name}"`)),
@@ -218,7 +228,7 @@ async function showDevice(name) {
       p.have.length
         ? el("ul", {}, p.have.map((o) => el("li", { class: "can" }, "✓ ",
             el("a", { href: "#part/" + encodeURIComponent(o.part.key) }, o.part.name),
-            el("span", { class: "meta" }, ` ×${o.items.length} · ${o.free} free${o.dedicated ? " · dedicated" : ""}`))))
+            el("span", { class: "meta" }, ` ×${o.items.length} · ${o.free} available${o.dedicated ? " · belongs to this device" : ""}`))))
         : el("p", { class: "meta" }, "Nothing you own fits."),
       p.cant_yet.map((s) => el("p", { class: "cant" }, "Can't yet: ", sig(s.signals), " → ",
         el("a", { href: "#part/" + encodeURIComponent(s.part.key) }, s.part.name))),
@@ -239,7 +249,7 @@ async function showSystem(name) {
       fill(msg,
         ...(res.missing || []).map((m) => el("p", { class: "warn" }, "Missing: " + m)),
         ...(res.blocked || []).map((b) => el("p", { class: "warn" }, b)),
-        res.blocked && res.blocked.length ? el("button", { onclick: () => toggle(true) }, "Take those down and bring this up") : null);
+        res.blocked && res.blocked.length ? el("button", { onclick: () => toggle(true) }, "Switch those off and this on") : null);
       return;
     }
     route();
@@ -247,7 +257,7 @@ async function showSystem(name) {
   const endpoint = (dev, port) => (dev ? dev + (port ? " · " + port : "") : "?");
   return [
     el("h2", {}, d.name, " ", statusTag(d.up ? "up" : "down")),
-    el("div", { class: "row" }, el("button", { onclick: () => toggle(false) }, d.up ? "Take it down" : "Bring it up")),
+    el("div", { class: "row" }, el("button", { onclick: () => toggle(false) }, d.up ? "Switch off" : "Switch on")),
     msg,
     el("table", {},
       el("tr", {}, ["", "from → to", "cable", "item"].map((h) => el("th", {}, h))),
@@ -255,7 +265,7 @@ async function showSystem(name) {
         el("td", { class: "meta" }, n + 1),
         el("td", {}, endpoint(l.from_device, l.from_port), " → ", endpoint(l.to_device, l.to_port)),
         el("td", {}, el("a", { href: "#part/" + encodeURIComponent(l.part) }, d.part_names[l.part])),
-        el("td", { class: "meta" }, l.assigned ? `#${d.short_ids[l.assigned]} in use` : l.preferred ? `pinned #${d.short_ids[l.preferred]}` : "any free")))),
+        el("td", { class: "meta" }, l.assigned ? `your #${d.short_ids[l.assigned]}, in use` : l.preferred ? `your #${d.short_ids[l.preferred]}` : "any you have")))),
     d.conflicts.map((c) => el("p", { class: "cant" }, `Can't be up with "${c.with}": `, c.port ? `both plug into ${c.port}` : `both need ${d.part_names[c.part] || c.part} (you own ${c.have})`)),
     d.missing.map((m) => el("p", { class: "warn" }, `Missing: needs ${m.need} × ${d.part_names[m.part] || m.part}, you own ${m.owned}`)),
   ];
@@ -286,7 +296,7 @@ async function showConnect() {
   to.addEventListener("change", () => fill(out));
   return [
     el("h2", {}, "Connect"),
-    el("p", { class: "meta" }, "From one device's outputs to the other's inputs: free cables first, then busy ones, then what to buy."),
+    el("p", { class: "meta" }, "From one device's outputs to the other's inputs: your available cables first, then ones in use, then what to buy."),
     el("div", { class: "row" }, from, el("span", {}, "→"), to, el("button", { onclick: go }, "Find a way")),
     out,
   ];
@@ -314,8 +324,9 @@ function connectResult(d) {
         el("li", { class: "end" }, el("strong", {}, d.from), el("span", { class: "meta" }, " · " + r.from_port)),
         r.steps.map((s) => el("li", { class: s.buy ? "step need" : "step" },
           el("a", { href: "#part/" + encodeURIComponent(s.part.key) }, s.part.name), " ",
-          s.buy ? el("span", { class: "tag need" }, "need") : el("span", { class: "status " + (s.busy_in ? "inuse" : "free") }, s.busy_in ? `#${shortId(s.item)} in use by ${s.busy_in}` : `#${shortId(s.item)} free`),
-          d.outlines[s.part.key] ? el("details", {}, el("summary", { class: "meta" }, "outline"), el("pre", {}, d.outlines[s.part.key])) : null)),
+          s.buy ? el("span", { class: "tag need", title: "You don't own one" }, "need")
+            : [idTag(s.item), " ", statusTag(s.busy_in ? "in use" : "free"), s.busy_in ? el("span", { class: "meta" }, ` by ${s.busy_in}`) : null],
+          d.outlines[s.part.key] ? el("details", { open: true }, el("summary", { class: "meta" }, "outline"), el("pre", {}, d.outlines[s.part.key])) : null)),
         el("li", { class: "end" }, el("strong", {}, d.to), el("span", { class: "meta" }, " · " + r.to_port))));
   });
 

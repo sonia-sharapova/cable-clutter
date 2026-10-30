@@ -57,7 +57,7 @@ cables:
 
   # Network and storage
   - {ends: [rj45:m, rj45:m], signals: [net.ethernet], name: "Ethernet cable", aliases: [patch cable]}
-  - {ends: [sata:m, sata:m], signals: [storage.sata], name: "SATA data cable"}
+  - {ends: [sata:f, sata:f], signals: [storage.sata], name: "SATA data cable", note: "Drives and motherboards have the male side"}
   - {ends: [esata:m, esata:m], signals: [storage.sata], name: "eSATA cable"}
 
   # Power

@@ -170,3 +170,14 @@ func BenchmarkConnect(b *testing.B) {
 		route.Connect(f.c, mac, crt, inv, route.Options{})
 	}
 }
+
+// The SATA to USB adapter converts: a drive's SATA becomes USB 3.0 that any
+// USB-A port takes.
+func TestSATADriveThroughAdapter(t *testing.T) {
+	f := setup(t)
+	f.own(t, "sata:f|usb-a-3.0:m")
+	r := f.connect(t, "sata-drive-2.5", "mac-mini-m2-2023", route.Options{})["data"]
+	if r == nil || !equal(keys(r), []string{"sata:f|usb-a-3.0:m"}) || r.Signal != "usb.3.0" || r.To.Label != "USB-A" {
+		t.Fatalf("drive → Mac mini = %+v", r)
+	}
+}

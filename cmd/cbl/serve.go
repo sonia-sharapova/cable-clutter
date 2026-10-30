@@ -174,7 +174,7 @@ func indexHandler(st *state, _ *http.Request) (any, error) {
 			} else if free == 0 {
 				status = "reserved"
 			}
-			sub := fmt.Sprintf("you own %d · %d free", len(items), free)
+			sub := fmt.Sprintf("you own %d · %d available", len(items), free)
 			if len(places) > 0 {
 				sub += " · " + strings.Join(places, ", ")
 			}

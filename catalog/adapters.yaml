@@ -21,7 +21,7 @@ adapters:
 
   # Storage
   - {ends: [sata:f, esata:f], signals: [storage.sata], name: "SATA to eSATA adapter (DVD / drive)"}
-  - {ends: [sata:f, usb-a-3.0:m], signals: [storage.sata, usb.3.0], active: true, name: "SATA / SSD to USB 3.0 adapter", aliases: [ssd to usb, sata to usb]}
+  - {ends: [sata:f, usb-a-3.0:m], signals: [usb.3.0], active: true, source: sata, in_signals: [storage.sata], name: "SATA / SSD to USB 3.0 adapter", aliases: [ssd to usb, sata to usb], note: "Powers a 2.5-inch drive from USB; a 3.5-inch drive needs its own power"}
   - {ends: [memory-stick:f, memory-stick-micro:f, microsd:f, xd:f, sd:f, cf:m], signals: [storage.card], name: "Multi-card to CompactFlash adapter (MS / M2 / TF / xD / SD)"}
 
   # Couplers
