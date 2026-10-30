@@ -1,0 +1,26 @@
+# What travels over a connector. Cables and ports are matched on signals,
+# not just plug shapes.
+signals:
+  - {id: usb.2.0, kind: data, name: "USB 2.0 data (480 Mb/s)"}
+  - {id: usb.3.0, kind: data, name: "USB 3.0 / 3.2 Gen 1 data (5 Gb/s)"}
+  - {id: usb4, kind: data, name: "USB4 / Thunderbolt 3-4 (40 Gb/s)"}
+  - {id: lightning.data, kind: data, name: "Lightning data (USB 2.0 speed)"}
+  - {id: apple30.data, kind: data, name: "Apple 30-pin dock data"}
+  - {id: video.hdmi, kind: video, name: "HDMI digital video + audio"}
+  - {id: video.dvi, kind: video, name: "DVI digital video (no audio)"}
+  - {id: video.displayport, kind: video, name: "DisplayPort video + audio"}
+  - {id: video.vga, kind: video, name: "VGA analog video"}
+  - {id: video.composite, kind: video, name: "Composite video (yellow RCA)"}
+  - {id: video.s-video, kind: video, name: "S-Video"}
+  - {id: video.component, kind: video, name: "Component video (YPbPr)"}
+  - {id: video.rgb, kind: video, name: "Analog RGB (SCART)"}
+  - {id: rf.antenna, kind: video, name: "RF antenna / coax TV signal"}
+  - {id: audio.analog.stereo, kind: audio, name: "Analog stereo audio"}
+  - {id: audio.analog.mic, kind: audio, name: "Analog microphone"}
+  - {id: audio.optical, kind: audio, name: "Optical digital audio (S/PDIF)"}
+  - {id: net.ethernet, kind: data, name: "Ethernet"}
+  - {id: storage.sata, kind: data, name: "SATA storage"}
+  - {id: storage.card, kind: data, name: "Memory card"}
+  - {id: power.ac, kind: power, name: "Mains AC power"}
+  - {id: power.dc, kind: power, name: "DC power"}
+  - {id: power.usb, kind: power, name: "USB bus / charging power"}

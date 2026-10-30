@@ -1,0 +1,72 @@
+# Cable types. An end is "connector[*count]:gender", e.g. "rca*3:m" is three
+# male RCA plugs. The canonical key is built from the sorted ends plus the
+# optional variant, so end order never matters.
+cables:
+  # USB
+  - {ends: [usb-a:m, usb-c:m], signals: [usb.2.0, power.usb], name: "USB-A to USB-C"}
+  - {ends: [usb-a-3.0:m, usb-c:m], signals: [usb.3.0, power.usb], name: "USB-A 3.0 to USB-C"}
+  - {ends: [usb-c:m, usb-c:m], signals: [usb.2.0, power.usb], name: "USB-C to USB-C (charge/data)"}
+  - {ends: [usb-c:m, usb-c:m], variant: usb4, signals: [usb4, video.displayport, power.usb], name: "Thunderbolt / USB4 cable", aliases: [thunderbolt cable]}
+  - {ends: [usb-a:m, micro-usb:m], signals: [usb.2.0, power.usb], name: "USB-A to Micro-USB"}
+  - {ends: [usb-a-3.0:m, micro-usb:m], signals: [usb.2.0, power.usb], name: "USB-A 3.0 to Micro-USB", note: "USB 3.0 plug with a USB 2.0 micro end: runs at USB 2.0 speed"}
+  - {ends: [usb-a-3.0:m, micro-usb-3.0:m], signals: [usb.3.0, power.usb], name: "USB 3.0 Micro-B cable (external drives)"}
+  - {ends: [usb-c:m, micro-usb:m], signals: [usb.2.0, power.usb], name: "USB-C to Micro-USB"}
+  - {ends: [usb-a:m, mini-usb:m], signals: [usb.2.0, power.usb], name: "USB-A to Mini-USB"}
+  - {ends: [usb-a:m, usb-b:m], signals: [usb.2.0], name: "USB-A to USB-B (printer cable)"}
+  - {ends: [usb-a-3.0:m, usb-b:m], signals: [usb.2.0], name: "USB-A 3.0 to USB-B", note: "USB-B end limits it to USB 2.0 speed"}
+  - {ends: [usb-a-3.0:m, usb-b-3.0:m], signals: [usb.3.0], name: "USB 3.0 A to B"}
+  - {ends: [usb-a:m, usb-a:f], signals: [usb.2.0, power.usb], name: "USB-A extension"}
+  - {ends: [usb-a:m, lightning:m], signals: [lightning.data, power.usb], name: "USB-A to Lightning"}
+  - {ends: [usb-a-3.0:m, lightning:m], signals: [lightning.data, power.usb], name: "USB-A 3.0 to Lightning", note: "Lightning is USB 2.0 speed whatever the plug"}
+  - {ends: [usb-c:m, lightning:m], signals: [lightning.data, power.usb], name: "USB-C to Lightning"}
+  - {ends: [usb-a:m, apple-30pin:m], signals: [apple30.data, power.usb], name: "USB-A to Apple 30-pin"}
+
+  # Video
+  - {ends: [hdmi:m, hdmi:m], signals: [video.hdmi], name: "HDMI cable"}
+  - {ends: [hdmi:m, mini-hdmi:m], signals: [video.hdmi], name: "HDMI to Mini-HDMI"}
+  - {ends: [hdmi:m, micro-hdmi:m], signals: [video.hdmi], name: "HDMI to Micro-HDMI"}
+  - {ends: [hdmi:m, usb-c:m], signals: [video.hdmi], active: true, name: "USB-C to HDMI", note: "USB-C end must support DisplayPort Alt Mode"}
+  - {ends: [hdmi:m, mini-dvi:m], signals: [video.dvi], name: "HDMI to Mini-DVI", note: "Video only, no audio"}
+  - {ends: [hdmi:m, dvi:m], signals: [video.dvi], name: "HDMI to DVI", note: "Video only, no audio"}
+  - {ends: [displayport:m, displayport:m], signals: [video.displayport], name: "DisplayPort cable"}
+  - {ends: [displayport:m, hdmi:m], signals: [video.hdmi], name: "DisplayPort to HDMI", note: "DisplayPort end to HDMI screen; the source port must support dual-mode (DP++)"}
+  - {ends: [mini-displayport:m, hdmi:m], signals: [video.hdmi], name: "Mini DisplayPort to HDMI"}
+  - {ends: [usb-c:m, displayport:m], signals: [video.displayport], name: "USB-C to DisplayPort", note: "USB-C end must support DisplayPort Alt Mode"}
+  - {ends: [vga:m, vga:m], signals: [video.vga], name: "VGA cable"}
+
+  # Analog AV
+  - {ends: [ps2-avmulti:m, "rca*3:m"], signals: [video.composite, audio.analog.stereo], name: "PlayStation AV cable (yellow/white/red)", aliases: [ps2 av cable]}
+  - {ends: [ps2-avmulti:m, "rca*5:m"], signals: [video.component, audio.analog.stereo], name: "PlayStation component cable"}
+  - {ends: [ps2-avmulti:m, s-video:m, "rca*2:m"], signals: [video.s-video, audio.analog.stereo], name: "PlayStation S-Video cable"}
+  - {ends: ["rca*3:m", "rca*3:m"], signals: [video.composite, audio.analog.stereo], name: "RCA AV cable (yellow/white/red)", aliases: [composite cable, av cable, yellow red white cable]}
+  - {ends: ["rca*2:m", "rca*2:m"], signals: [audio.analog.stereo], name: "RCA stereo audio cable (white/red)", aliases: [red white cable]}
+  - {ends: [scart:m, scart:m], signals: [video.rgb, video.composite, audio.analog.stereo], name: "SCART cable"}
+  - {ends: [scart:m, "rca*3:m"], signals: [video.composite, audio.analog.stereo], name: "SCART to RCA"}
+  - {ends: [s-video:m, s-video:m], signals: [video.s-video], name: "S-Video cable"}
+  - {ends: [coax-f:m, coax-f:m], signals: [rf.antenna], name: "Coax antenna cable"}
+  - {ends: [trrs-3.5:m, "rca*3:m"], signals: [video.composite, audio.analog.stereo], name: "3.5 mm TRRS to RCA AV cable", note: "Pinouts differ between devices (e.g. Raspberry Pi vs camcorders); check before buying"}
+
+  # Audio
+  - {ends: [trs-3.5:m, trs-3.5:m], signals: [audio.analog.stereo], name: "Aux cable (3.5 mm)", aliases: [aux cable]}
+  - {ends: [trs-3.5:m, "rca*2:m"], signals: [audio.analog.stereo], name: "3.5 mm to RCA stereo breakout", aliases: [y cable, stereo breakout, aux to rca]}
+  - {ends: [trs-3.5:m, "trs-3.5*2:f"], signals: [audio.analog.stereo], name: "3.5 mm headphone splitter", aliases: [headphone splitter, y splitter, two headed aux]}
+  - {ends: [trs-3.5:m, trs-6.35:m], signals: [audio.analog.stereo], name: "3.5 mm to 6.35 mm"}
+  - {ends: [toslink:m, toslink:m], signals: [audio.optical], name: "Optical audio cable"}
+
+  # Network and storage
+  - {ends: [rj45:m, rj45:m], signals: [net.ethernet], name: "Ethernet cable", aliases: [patch cable]}
+  - {ends: [sata:m, sata:m], signals: [storage.sata], name: "SATA data cable"}
+  - {ends: [esata:m, esata:m], signals: [storage.sata], name: "eSATA cable"}
+
+  # Power
+  - {ends: [nema-1-15:m, iec-c7:f], signals: [power.ac], name: "Figure-8 power cord (2-prong)"}
+  - {ends: [nema-5-15:m, iec-c5:f], signals: [power.ac], name: "Cloverleaf power cord (3-prong)", aliases: [laptop power cord]}
+  - {ends: [nema-5-15:m, iec-c13:f], signals: [power.ac], name: "Kettle / PC power cord (3-prong)"}
+  - {ends: [nema-1-15:m, dc-barrel:m], variant: 8.5v, volts: 8.5, signals: [power.dc], name: "AC adaptor 8.5 V (PlayStation 2 slim)"}
+  - {ends: [nema-1-15:m, dc-barrel:m], variant: 5v-2a, volts: 5, amps: 2, signals: [power.dc], name: "AC adaptor 5 V 2 A (PSP)"}
+  - {ends: [nema-5-15:m, dc-barrel:m], variant: 9v, volts: 9, signals: [power.dc], name: "AC adaptor 9 V (3-prong)"}
+  - {ends: [nema-1-15:m, micro-usb:m], variant: 5v, volts: 5, signals: [power.usb], name: "Micro-USB power supply (Raspberry Pi 3 and earlier)"}
+  - {ends: [nema-1-15:m, usb-c:m], variant: 5v-3a, volts: 5, amps: 3, signals: [power.usb], name: "USB-C power supply (Raspberry Pi 4)"}
+  - {ends: [nema-1-15:m, 3ds-dc:m], variant: 4.6v, volts: 4.6, amps: 0.9, signals: [power.dc], name: "Nintendo 3DS AC adaptor"}
+  - {ends: [usb-a:m, 3ds-dc:m], signals: [power.usb], name: "USB to 3DS charging cable"}
+  - {ends: [usb-a:m, dc-barrel:m], variant: 5v, volts: 5, signals: [power.usb], name: "USB to 5 V barrel (e.g. PSP charging)"}

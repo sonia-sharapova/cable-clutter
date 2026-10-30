@@ -1,0 +1,57 @@
+# Connector shapes. IDs are stable forever: library rows reference them.
+# Aliases are what people actually type; matching ignores case, spaces,
+# hyphens and underscores.
+connectors:
+  # USB and Apple
+  - {id: usb-a, family: usb, name: "USB Type-A", aliases: [usb, usb a, type a, usb 2.0 a]}
+  - {id: usb-a-3.0, family: usb, name: "USB 3.0 Type-A (SuperSpeed, blue)", aliases: [usb 3, usb3, usb 3.0, usbs, usb ss, superspeed]}
+  - {id: usb-b, family: usb, name: "USB Type-B (printer)", aliases: [usb b, type b, printer cable]}
+  - {id: usb-b-3.0, family: usb, name: "USB 3.0 Type-B", aliases: [usb 3 b, usb3 b]}
+  - {id: usb-c, family: usb, name: "USB Type-C", aliases: [usbc, type c, usb c, thunderbolt 3, thunderbolt 4]}
+  - {id: micro-usb, family: usb, name: "Micro-USB (Micro-B)", aliases: [micro usb, micro b, microusb]}
+  - {id: micro-usb-3.0, family: usb, name: "Micro-USB 3.0 (Micro-B SuperSpeed)", aliases: [micro usb 3, micro b 3.0]}
+  - {id: mini-usb, family: usb, name: "Mini-USB (Mini-B)", aliases: [mini usb, mini b, miniusb]}
+  - {id: lightning, family: apple, name: "Apple Lightning", aliases: [iphone cable, lightening]}
+  - {id: apple-30pin, family: apple, name: "Apple 30-pin dock connector", aliases: [30 pin, 30pin, ipod cable, dock connector]}
+
+  # Video
+  - {id: hdmi, family: video, name: "HDMI (Type A)", aliases: [hdmi a]}
+  - {id: mini-hdmi, family: video, name: "Mini-HDMI (Type C)", aliases: [mini hdmi]}
+  - {id: micro-hdmi, family: video, name: "Micro-HDMI (Type D)", aliases: [micro hdmi]}
+  - {id: displayport, family: video, name: "DisplayPort", aliases: [dp, display port]}
+  - {id: mini-displayport, family: video, name: "Mini DisplayPort", aliases: [mini dp, mdp, thunderbolt 2]}
+  - {id: dvi, family: video, name: "DVI", aliases: [dvi d, dvi i]}
+  - {id: mini-dvi, family: video, name: "Apple Mini-DVI", aliases: [mini dvi]}
+  - {id: vga, family: video, name: "VGA (DE-15)", aliases: [d sub, de15, svga]}
+  - {id: scart, family: video, name: "SCART", aliases: [peritel, euroconnector]}
+  - {id: s-video, family: video, name: "S-Video (4-pin mini-DIN)", aliases: [svideo, s video]}
+  - {id: rca, family: av, name: "RCA (phono)", aliases: [phono, cinch, composite, av, yellow red white, red white]}
+  - {id: ps2-avmulti, family: av, name: "PlayStation AV Multi Out", aliases: [ps2 av, ps1 av, av multi, playstation av, ps3 av]}
+  - {id: coax-f, family: av, name: "F-type coax (TV antenna)", aliases: [coax, antenna, rf, cable tv]}
+
+  # Audio
+  - {id: trs-3.5, family: audio, name: "3.5 mm stereo jack (TRS)", aliases: [aux, 3.5mm, 3.5 mm, headphone jack, mini jack, eighth inch, 1/8 inch]}
+  - {id: trrs-3.5, family: audio, name: "3.5 mm headset / AV jack (TRRS)", aliases: [trrs, headset jack, 4 pole]}
+  - {id: trs-6.35, family: audio, name: "6.35 mm jack (1/4 inch)", aliases: [quarter inch, 1/4 inch, 6.35mm, jack]}
+  - {id: toslink, family: audio, name: "TOSLINK optical", aliases: [optical, spdif, s/pdif]}
+
+  # Network and storage
+  - {id: rj45, family: network, name: "Ethernet (RJ45)", aliases: [ethernet, lan, cat5, cat5e, cat6, network]}
+  - {id: sata, family: storage, name: "SATA (data)", aliases: [ssd, hard drive, hdd, dvd drive]}
+  - {id: esata, family: storage, name: "eSATA", aliases: [external sata]}
+  - {id: sd, family: card, name: "SD card", aliases: [sd card, sdhc, sdxc]}
+  - {id: microsd, family: card, name: "microSD card", aliases: [micro sd, tf, transflash]}
+  - {id: cf, family: card, name: "CompactFlash", aliases: [compact flash, cf card]}
+  - {id: memory-stick, family: card, name: "Memory Stick (Duo / PRO Duo)", aliases: [ms, ms duo, memory stick duo, ms pro duo]}
+  - {id: memory-stick-micro, family: card, name: "Memory Stick Micro (M2)", aliases: [m2, ms micro]}
+  - {id: xd, family: card, name: "xD-Picture Card", aliases: [xd card, xd picture]}
+
+  # Power
+  - {id: nema-1-15, family: power, name: "US 2-prong plug (NEMA 1-15)", aliases: [2 prong, two prong, us plug, outlet]}
+  - {id: nema-5-15, family: power, name: "US 3-prong plug (NEMA 5-15)", aliases: [3 prong, three prong, grounded plug]}
+  - {id: cee-7-16, family: power, name: "Europlug (CEE 7/16)", aliases: [eu plug, europe plug, european plug]}
+  - {id: iec-c7, family: power, name: "IEC C7 figure-8", aliases: [figure 8, figure eight, c7]}
+  - {id: iec-c5, family: power, name: "IEC C5 cloverleaf", aliases: [cloverleaf, mickey mouse, c5]}
+  - {id: iec-c13, family: power, name: "IEC C13 (kettle / PC)", aliases: [kettle, c13, pc power]}
+  - {id: dc-barrel, family: power, name: "DC barrel plug", aliases: [barrel, dc jack, dc plug]}
+  - {id: 3ds-dc, family: power, name: "Nintendo 3DS / DSi charge port", aliases: [3ds charger, dsi charger, 3ds]}

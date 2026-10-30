@@ -1,0 +1,29 @@
+# Adapters: rigid parts with no cable between the ends (plug converters,
+# couplers, hubs, chargers). Same end syntax as cables.yaml; kept in their
+# own inventory.
+adapters:
+  # Power
+  - {ends: [nema-1-15:f, cee-7-16:m], signals: [power.ac], name: "US to EU plug adapter", aliases: [travel adapter], note: "Changes plug shape only, not voltage"}
+  - {ends: [nema-5-15:f, nema-1-15:m], signals: [power.ac], name: "3-prong to 2-prong adapter", aliases: [cheater plug, ground lift], note: "Drops the ground pin"}
+  - {ends: [nema-1-15:m, usb-c:f], signals: [power.usb], name: "USB-C wall charger", aliases: [usb c charger]}
+  - {ends: [nema-1-15:m, usb-a:f], signals: [power.usb], name: "USB-A wall charger", aliases: [usb charger, usb brick]}
+
+  # Hubs and dongles
+  - {ends: [lightning:m, hdmi:f, lightning:f], signals: [video.hdmi, power.usb], active: true, name: "Lightning Digital AV adapter", note: "HDMI out from iPhone/iPad, with charging pass-through"}
+  - {ends: [usb-c:m, usb-a:f, hdmi:f, usb-c:f], signals: [usb.3.0, video.hdmi, power.usb], active: true, name: "USB-C multiport adapter (USB-A, HDMI, USB-C)"}
+  - {ends: [usb-c:m, hdmi:f, usb-a:f, usb-a-3.0:f, sd:f, microsd:f, usb-c:f], signals: [usb.3.0, video.hdmi, storage.card, power.usb], active: true, name: "USB-C hub with card reader (HDMI, USB, SD, microSD, USB-C)"}
+  - {ends: [usb-a:f, usb-c:m], signals: [usb.3.0, power.usb], name: "USB-C to USB-A adapter (OTG)", aliases: [otg]}
+  - {ends: [usb-c:f, usb-a:m], signals: [usb.2.0, power.usb], name: "USB-A to USB-C adapter"}
+  - {ends: [usb-c:m, trs-3.5:f], signals: [audio.analog.stereo], active: true, name: "USB-C to 3.5 mm headphone adapter", aliases: [usb c dongle]}
+  - {ends: [lightning:m, trs-3.5:f], signals: [audio.analog.stereo], active: true, name: "Lightning to 3.5 mm headphone adapter"}
+  - {ends: [hdmi:f, "rca*3:f"], signals: [video.composite, audio.analog.stereo], active: true, name: "HDMI to composite (AV) converter", aliases: [hdmi to av, hdmi to rca], note: "Needs USB power; lets modern sources drive a CRT"}
+
+  # Storage
+  - {ends: [sata:f, esata:f], signals: [storage.sata], name: "SATA to eSATA adapter (DVD / drive)"}
+  - {ends: [sata:f, usb-a-3.0:m], signals: [storage.sata, usb.3.0], active: true, name: "SATA / SSD to USB 3.0 adapter", aliases: [ssd to usb, sata to usb]}
+  - {ends: [memory-stick:f, memory-stick-micro:f, microsd:f, xd:f, sd:f, cf:m], signals: [storage.card], name: "Multi-card to CompactFlash adapter (MS / M2 / TF / xD / SD)"}
+
+  # Couplers
+  - {ends: [hdmi:f, hdmi:f], signals: [video.hdmi], name: "HDMI coupler"}
+  - {ends: [rca:f, rca:f], signals: [video.composite, audio.analog.stereo], name: "RCA coupler"}
+  - {ends: [trs-3.5:f, trs-3.5:f], signals: [audio.analog.stereo], name: "3.5 mm coupler"}
