@@ -24,6 +24,8 @@ type Connector struct {
 	Name    string   `json:"name"`
 	Aliases []string `json:"aliases,omitempty"`
 	Mates   []string `json:"mates,omitempty"` // other connectors it physically plugs into
+	// Uncommon connectors are hidden in pickers until asked for.
+	Uncommon bool `json:"uncommon,omitempty"`
 }
 
 type Kind string
@@ -50,6 +52,16 @@ type Part struct {
 	Amps      float64
 	Aliases   []string
 	Note      string
+}
+
+// Uncommon reports whether any of the part's connectors is uncommon.
+func (c *Catalog) Uncommon(p *Part) bool {
+	for _, e := range p.Ends {
+		if c.Connectors[e.Connector].Uncommon {
+			return true
+		}
+	}
+	return false
 }
 
 // Catalog is the read-only catalog plus its indexes. Every map lookup is O(1);

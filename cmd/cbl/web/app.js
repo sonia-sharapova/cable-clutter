@@ -206,37 +206,52 @@ async function showPart(key) {
 
 // --- inventory: everything you own, filtered in the page ------------------
 
-const invFilter = { kind: "all", category: "all", connector: "", status: "all" };
+// --- inventory: everything you own, filtered and searched in the page -----
+
+const invFilter = { kind: "all", category: "all", connector: "", status: "all", query: "", open: false };
+
+// wordStarts lists every word-start suffix of some text, folded like the
+// search index: "USB-A to Lightning" → usbatolightning, tolightning, lightning.
+const wordStarts = (text) => words(text).map((_, k, ws) => norm(ws.slice(k).join("")));
 
 async function showInventory() {
   const rows = await api("/api/inventory");
+  for (const r of rows) {
+    r.search = [r.name, r.kind, ...r.ends, ...r.categories, ...r.items.flatMap((it) => [it.nickname, it.location, it.for, it.short_id])]
+      .filter(Boolean).flatMap(wordStarts);
+  }
   const list = el("div", {});
-  const chips = (key, options) => el("div", { class: "filter" },
-    el("span", { class: "meta label" }, key),
-    options.map((o) => el("button", {
-      class: "chip", "aria-pressed": String(invFilter[key] === o),
-      onclick: (e) => {
-        invFilter[key] = o;
-        for (const b of e.target.parentNode.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b === e.target));
-        draw();
-      },
-    }, o)));
+  const select = (key, options) => el("select", { onchange: (e) => { invFilter[key] = e.target.value; draw(); } },
+    options.map(([value, label]) => el("option", { value, selected: invFilter[key] === value }, label)));
 
   // Only offer categories and connectors that occur in what you own.
   const categories = [...new Set(rows.flatMap((r) => r.categories))].sort();
   const connectors = new Map();
   for (const r of rows) for (const c of r.connectors) connectors.set(c.id, { name: c.name, n: (connectors.get(c.id)?.n || 0) + r.items.length });
-  const connector = el("select", { onchange: (e) => { invFilter.connector = e.target.value; draw(); } },
-    el("option", { value: "" }, "any connector"),
-    [...connectors].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([id, c]) =>
-      el("option", { value: id, selected: invFilter.connector === id }, `${c.name} (${c.n})`)));
+  const panel = el("div", { class: "filter-panel", hidden: !invFilter.open },
+    el("label", {}, "kind", select("kind", [["all", "all"], ["cables", "cables"], ["adapters", "adapters"]])),
+    el("label", {}, "carries", select("category", [["all", "anything"], ...categories.map((c) => [c, c])])),
+    el("label", {}, "connector", select("connector", [["", "any connector"],
+      ...[...connectors].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([id, c]) => [id, `${c.name} (${c.n})`])])),
+    el("label", {}, "status", select("status", [["all", "any"], ["available", "available"], ["in use", "in use"], ["reserved", "reserved"]])),
+    el("button", { class: "quiet", onclick: () => { Object.assign(invFilter, { kind: "all", category: "all", connector: "", status: "all" }); route(); } }, "clear filters"));
+  const filterButton = el("button", { onclick: () => { invFilter.open = !invFilter.open; panel.hidden = !invFilter.open; filterLabel(); } });
+  const filterLabel = () => {
+    const n = ["kind", "category", "status"].filter((k) => invFilter[k] !== "all").length + (invFilter.connector ? 1 : 0);
+    fill(filterButton, `Filter${n ? ` (${n})` : ""} ${invFilter.open ? "▴" : "▾"}`);
+  };
+  const searchBox = el("input", { type: "search", class: "inline", placeholder: "search your inventory", value: invFilter.query,
+    oninput: (e) => { invFilter.query = e.target.value; draw(); } });
 
   function draw() {
+    filterLabel();
+    const q = norm(invFilter.query);
     const shown = [];
     for (const r of rows) {
       if (invFilter.kind !== "all" && r.kind + "s" !== invFilter.kind) continue;
       if (invFilter.category !== "all" && !r.categories.includes(invFilter.category)) continue;
       if (invFilter.connector && !r.connectors.some((c) => c.id === invFilter.connector)) continue;
+      if (q && !r.search.some((w) => w.startsWith(q))) continue;
       const items = invFilter.status === "all" ? r.items : r.items.filter((it) => STATUS[it.status][0] === invFilter.status);
       if (items.length) shown.push({ ...r, items });
     }
@@ -245,28 +260,25 @@ async function showInventory() {
       el("p", { class: "meta" }, `Showing ${shown.length} type${shown.length === 1 ? "" : "s"} · ${n} item${n === 1 ? "" : "s"}`),
       shown.length
         ? el("table", { class: "inventory" },
-            el("tr", {}, ["item", "ends", "you own", "where"].map((h) => el("th", {}, h))),
+            el("tr", {}, ["item", "ends", "you own", "available"].map((h) => el("th", {}, h))),
             shown.map((r) => {
               const free = r.items.filter((it) => it.status === "free").length;
-              const where = [...new Set(r.items.map((it) => it.location).filter(Boolean))].join(", ");
               return el("tr", {},
                 el("td", {}, el("a", { href: "#part/" + encodeURIComponent(r.key) }, r.name),
                   el("span", { class: "sub" }, r.kind, " · ", r.categories.join(", "))),
-                el("td", { class: "meta" }, r.ends.join(" ↔ ")),
-                el("td", {}, r.items.length, " ", el("span", { class: "meta" }, free === r.items.length ? "all available" : `${free} available`)),
-                el("td", { class: "meta" }, where));
+                el("td", {}, el("pre", { class: "mini", title: r.ends.join(" ↔ ") }, r.outline)),
+                el("td", {}, r.items.length),
+                el("td", { class: free ? "can" : "cant", title: `${free} of ${r.items.length} available` }, free ? "yes" : "no"));
             }))
-        : el("p", {}, "Nothing matches these filters."));
+        : el("p", {}, "Nothing matches."));
   }
   draw();
   const total = rows.reduce((sum, r) => sum + r.items.length, 0);
   return [
     el("h2", {}, "Inventory"),
-    el("p", { class: "meta" }, `${total} items of ${rows.length} types. Filter by what they are, what they carry, their plugs, or whether they're free.`),
-    chips("kind", ["all", "cables", "adapters"]),
-    chips("category", ["all", ...categories]),
-    el("div", { class: "filter" }, el("span", { class: "meta label" }, "connector"), connector),
-    chips("status", ["all", "available", "in use", "reserved"]),
+    el("p", { class: "meta" }, `${total} items of ${rows.length} types.`),
+    el("div", { class: "toolbar" }, filterButton, searchBox),
+    panel,
     list,
   ];
 }
@@ -309,8 +321,75 @@ async function showDevice(name) {
   ];
 }
 
+// --- systems ---------------------------------------------------------------
+
+// linkEditor picks cables for a system, one row per cable: device · port →
+// cable (yours first, then common types, uncommon on request) and which of
+// yours → device · port. The far-side ports are those the cable fits.
+function linkEditor(b, { rows: startRows = 1 } = {}) {
+  const editor = el("div", { class: "links" });
+  let showUncommon = false;
+  const allFits = [...new Set(b.devices.flatMap((d) => d.ports.flatMap((p) => p.fits)))];
+  const device = (name) => b.devices.find((d) => d.name === name);
+  const port = (dev, label) => (device(dev)?.ports || []).find((p) => p.label === label);
+
+  function row() {
+    const r = el("div", { class: "link-row" });
+    const fromDev = el("select", {}), fromPort = el("select", {}), cable = el("select", {}), item = el("select", {});
+    const toDev = el("select", {}), toPort = el("select", {});
+    const options = (sel, opts, keep) => {
+      const old = keep ? sel.value : "";
+      fill(sel, opts);
+      if ([...sel.options].some((o) => o.value === old)) sel.value = old;
+    };
+    const devOptions = () => [el("option", { value: "" }, "device"), b.devices.map((d) => el("option", { value: d.name }, d.name))];
+    const portOptions = (dev, key) => {
+      const ports = (device(dev)?.ports || []).filter((p) => !key || p.fits.includes(key));
+      return [el("option", { value: "" }, ports.length ? "port" : dev ? "no port fits" : "port"),
+        ports.map((p) => el("option", { value: p.label }, `${p.label} · ${p.end}`))];
+    };
+    function update() {
+      options(fromPort, portOptions(fromDev.value), true);
+      const keys = (port(fromDev.value, fromPort.value)?.fits || allFits).slice()
+        .sort((x, y) => b.parts[x].name.localeCompare(b.parts[y].name));
+      const yours = keys.filter((k) => b.parts[k].items.length);
+      const common = keys.filter((k) => !b.parts[k].items.length && !b.parts[k].uncommon);
+      const rare = keys.filter((k) => !b.parts[k].items.length && b.parts[k].uncommon);
+      const opt = (k) => el("option", { value: k }, b.parts[k].name + (b.parts[k].items.length ? ` (${b.parts[k].available} available)` : ""));
+      options(cable, [el("option", { value: "" }, "cable or adapter"),
+        yours.length ? el("optgroup", { label: "yours" }, yours.map(opt)) : null,
+        common.length ? el("optgroup", { label: "common" }, common.map(opt)) : null,
+        showUncommon && rare.length ? el("optgroup", { label: "uncommon" }, rare.map(opt)) : null], true);
+      const part = b.parts[cable.value];
+      options(item, [el("option", { value: "" }, part && part.items.length ? "any of yours" : "—"),
+        (part ? part.items : []).map((it) => el("option", { value: it.id }, `your #${it.short_id}${it.nickname ? " " + it.nickname : ""} · ${STATUS[it.status][0]}`))], true);
+      item.disabled = !part || !part.items.length;
+      options(toPort, portOptions(toDev.value, cable.value), true);
+    }
+    options(fromDev, devOptions());
+    options(toDev, devOptions());
+    for (const sel of [fromDev, fromPort, cable, item, toDev, toPort]) sel.addEventListener("change", update);
+    update();
+    r.value = () => cable.value && { part: cable.value, item: item.value, from_device: fromDev.value, from_port: fromPort.value, to_device: toDev.value, to_port: toPort.value };
+    r.refresh = update;
+    return fill(r, fromDev, fromPort, el("span", { class: "arrow" }, "→"), cable, item, el("span", { class: "arrow" }, "→"), toDev, toPort,
+      el("button", { class: "quiet", title: "Remove this cable", onclick: () => r.remove() }, "×"));
+  }
+
+  for (let n = 0; n < startRows; n++) editor.append(row());
+  const controls = el("div", { class: "row" },
+    el("button", { class: "quiet", onclick: () => editor.append(row()) }, "+ another cable"),
+    el("label", { class: "meta check" }, el("input", { type: "checkbox", onchange: (e) => {
+      showUncommon = e.target.checked;
+      for (const r of editor.children) r.refresh();
+    } }), " show uncommon cables (SCART, VGA, FireWire-era…)"));
+  const node = el("div", {}, editor, controls);
+  node.value = () => [...editor.children].map((r) => r.value()).filter(Boolean);
+  return node;
+}
+
 async function showSystem(name) {
-  const d = await api("/api/system?name=" + encodeURIComponent(name));
+  const [d, b] = await Promise.all([api("/api/system?name=" + encodeURIComponent(name)), api("/api/builder")]);
   const msg = el("div", {});
   const toggle = async (sw) => {
     const res = await api(d.up ? "/api/system/down" : "/api/system/up", { name: d.name, switch: sw });
@@ -318,38 +397,107 @@ async function showSystem(name) {
     if (res.up === d.up) {
       // Didn't come up: say why, and offer to switch.
       fill(msg,
-        ...(res.missing || []).map((m) => el("p", { class: "warn" }, "Missing: " + m)),
-        ...(res.blocked || []).map((b) => el("p", { class: "warn" }, b)),
+        (res.missing || []).map((m) => el("p", { class: "warn" }, "Missing: " + m)),
+        (res.blocked || []).map((x) => el("p", { class: "warn" }, x)),
         res.blocked && res.blocked.length ? el("button", { onclick: () => toggle(true) }, "Switch those off and this on") : null);
       return;
     }
     route();
   };
+  const post = async (path, body) => {
+    try {
+      await api(path, body);
+      await refresh();
+      route();
+    } catch (err) {
+      fill(msg, el("p", { class: "warn" }, err.message));
+    }
+  };
   const endpoint = (dev, port) => (dev ? dev + (port ? " · " + port : "") : "?");
+  const adder = linkEditor(b);
+  const del = el("button", { class: "quiet danger", onclick: () => {
+    // Two clicks, no dialog: the first arms it for a few seconds.
+    if (del.dataset.armed) return post("/api/system/delete", { name: d.name }).then(() => (location.hash = "#systems"));
+    del.dataset.armed = "1";
+    fill(del, "Click again to delete");
+    setTimeout(() => { delete del.dataset.armed; fill(del, "Delete system"); }, 3000);
+  } }, "Delete system");
   return [
+    el("a", { href: "#systems", class: "meta" }, "← systems"),
     el("h2", {}, d.name, " ", statusTag(d.up ? "up" : "down")),
     el("div", { class: "row" }, el("button", { onclick: () => toggle(false) }, d.up ? "Switch off" : "Switch on")),
     msg,
-    el("table", {},
-      el("tr", {}, ["", "from → to", "cable", "item"].map((h) => el("th", {}, h))),
-      d.links.map((l, n) => el("tr", {},
-        el("td", { class: "meta" }, n + 1),
-        el("td", {}, endpoint(l.from_device, l.from_port), " → ", endpoint(l.to_device, l.to_port)),
-        el("td", {}, el("a", { href: "#part/" + encodeURIComponent(l.part) }, d.part_names[l.part])),
-        el("td", { class: "meta" }, l.assigned ? `your #${d.short_ids[l.assigned]}, in use` : l.preferred ? `your #${d.short_ids[l.preferred]}` : "any you have")))),
-    d.conflicts.map((c) => el("p", { class: "cant" }, `Can't be up with "${c.with}": `, c.port ? `both plug into ${c.port}` : `both need ${d.part_names[c.part] || c.part} (you own ${c.have})`)),
+    d.links.length
+      ? el("table", {},
+          el("tr", {}, ["", "from → to", "cable", "item", ""].map((h) => el("th", {}, h))),
+          d.links.map((l, n) => el("tr", {},
+            el("td", { class: "meta" }, n + 1),
+            el("td", {}, endpoint(l.from_device, l.from_port), " → ", endpoint(l.to_device, l.to_port)),
+            el("td", {}, el("a", { href: "#part/" + encodeURIComponent(l.part) }, d.part_names[l.part])),
+            el("td", { class: "meta" }, l.assigned ? `your #${d.short_ids[l.assigned]}, in use` : l.preferred ? `your #${d.short_ids[l.preferred]}` : "open: any available"),
+            el("td", {}, d.up ? null : el("button", { class: "quiet", title: "Remove this cable", onclick: () => post("/api/system/unlink", { id: l.id }) }, "×")))))
+      : el("p", { class: "meta" }, "No cables yet."),
+    d.conflicts.map((c) => el("p", { class: "cant" }, `Can't be on with "${c.with}": `, c.port ? `both plug into ${c.port}` : `both need ${d.part_names[c.part] || c.part} (you own ${c.have})`)),
     d.missing.map((m) => el("p", { class: "warn" }, `Missing: needs ${m.need} × ${d.part_names[m.part] || m.part}, you own ${m.owned}`)),
+    d.up ? null : el("details", { class: "box" }, el("summary", {}, "Add a cable"),
+      adder,
+      el("button", { onclick: async () => {
+        for (const l of adder.value()) await post("/api/system/link", { system: d.name, ...l });
+      } }, "Add")),
+    el("div", { class: "row" }, del),
   ];
 }
 
 async function showSystems() {
+  const b = await api("/api/builder");
   const systems = index.entries.filter((e) => e.kind === "system");
+  const msg = el("div", {});
+  const name = el("input", { type: "text", class: "inline", placeholder: "e.g. Retro corner" });
+  const chain = el("div", { class: "row" });
+  const devSelect = (value) => el("select", {}, el("option", { value: "" }, "device"),
+    b.devices.filter((d) => d.model).map((d) => el("option", { value: d.name, selected: d.name === value }, d.name)));
+  chain.append(devSelect(), el("span", { class: "arrow" }, "→"), devSelect());
+  const addDevice = el("button", { class: "quiet", onclick: () => addDevice.before(el("span", { class: "arrow" }, "→"), devSelect()) }, "+ device");
+  chain.append(addDevice);
+  const editor = linkEditor(b);
+  const details = el("details", { class: "box" },
+    el("summary", {}, "Details: choose the cables and ports yourself"),
+    el("p", { class: "meta" }, "Hidden, the cables are left open: the system is planned for you, and any available cable of the right type is used when it's switched on."),
+    editor);
+  const create = async () => {
+    const links = details.open ? editor.value() : [];
+    const devices = [...chain.querySelectorAll("select")].map((s) => s.value).filter(Boolean);
+    try {
+      const res = await api("/api/system/new", { name: name.value, devices, links });
+      await refresh();
+      location.hash = "#system/" + encodeURIComponent(res.name);
+    } catch (err) {
+      fill(msg, el("p", { class: "warn" }, err.message));
+    }
+  };
+  const toggle = async (s) => {
+    await api(s.status === "up" ? "/api/system/down" : "/api/system/up", { name: s.title });
+    await refresh();
+    route();
+  };
   return [
     el("h2", {}, "Systems"),
+    el("p", { class: "meta" }, "A system is a setup you switch on and off. Its cables are in use while it's on."),
     systems.length
-      ? el("ul", {}, systems.map((s) => el("li", {},
-          statusTag(s.status), " ", el("a", { href: "#system/" + encodeURIComponent(s.title) }, s.title), " ", el("span", { class: "meta" }, s.sub))))
-      : el("p", { class: "meta" }, "No systems yet. ", el("code", {}, 'cbl plan PS2 "CRT TV" --save "Retro corner"')),
+      ? el("table", {},
+          el("tr", {}, ["", "system", "", ""].map((h) => el("th", {}, h))),
+          systems.map((s) => el("tr", {},
+            el("td", {}, statusTag(s.status)),
+            el("td", {}, el("a", { href: "#system/" + encodeURIComponent(s.title) }, s.title)),
+            el("td", { class: "meta" }, s.sub),
+            el("td", {}, el("button", { class: "quiet", onclick: () => toggle(s) }, s.status === "up" ? "Switch off" : "Switch on")))))
+      : el("p", { class: "meta" }, "No systems yet."),
+    el("h3", {}, "New system"),
+    el("label", { class: "field" }, "name", name),
+    el("div", { class: "field" }, el("span", { class: "meta" }, "devices, in order"), chain),
+    details,
+    msg,
+    el("div", { class: "row" }, el("button", { onclick: create }, "Create system")),
   ];
 }
 
@@ -427,6 +575,18 @@ function wishButton(parts, note) {
 
 async function showWish() {
   const wishes = await api("/api/wish");
+  const results = el("ul", { class: "wish-results" });
+  const add = async (key) => {
+    await api("/api/wish/add", { parts: [key], note: "" });
+    route();
+  };
+  const searchBox = el("input", { type: "search", class: "inline", placeholder: "find a cable or adapter to add",
+    oninput: (e) => {
+      const hits = lookup(e.target.value).map((i) => index.entries[i]).filter((x) => ["cable", "adapter", "type"].includes(x.kind)).slice(0, 8);
+      fill(results, hits.map((x) => el("li", {},
+        el("button", { class: "quiet", onclick: () => add(x.id.slice(5)) }, "+ add"), " ", x.title, " ",
+        el("span", { class: "meta" }, x.kind === "type" ? "" : "· you own some"))));
+    } });
   const done = async (id) => {
     await api("/api/wish/done", { id });
     await refresh();
@@ -434,14 +594,19 @@ async function showWish() {
   };
   return [
     el("h2", {}, "Wishlist"),
+    el("div", { class: "toolbar" }, searchBox),
+    results,
     wishes.length
-      ? el("table", {},
-          el("tr", {}, ["item", "qty", "for", ""].map((h) => el("th", {}, h))),
-          wishes.map((w) => el("tr", {},
-            el("td", {}, el("a", { href: "#part/" + encodeURIComponent(w.part) }, w.name), w.notes ? el("span", { class: "sub" }, w.notes) : null),
-            el("td", {}, w.qty), el("td", {}, w.for || ""),
-            el("td", {}, el("button", { onclick: () => done(w.id) }, "Bought")))))
-      : el("p", { class: "meta" }, "Empty. Connect two devices to see what you're missing."),
+      ? el("table", { class: "wishlist" },
+          el("tr", {}, ["acquired", "item", "qty", "use case"].map((h) => el("th", {}, h))),
+          wishes.map((w) => el("tr", { class: w.done ? "done" : "" },
+            el("td", {}, el("input", { type: "checkbox", checked: w.done, disabled: w.done,
+              title: w.done ? "Acquired: it's in your inventory" : "Tick when you have it: it moves into your inventory",
+              onchange: () => done(w.id) })),
+            el("td", {}, el("a", { href: "#part/" + encodeURIComponent(w.part) }, w.name)),
+            el("td", {}, w.qty),
+            el("td", { class: "meta" }, w.use_case))))
+      : el("p", { class: "meta" }, "Empty. Search above, or connect two devices to see what you're missing."),
   ];
 }
 

@@ -10,7 +10,7 @@
   --highlight: rgb(0 0 0 / 0.07);
   --monospace: ui-monospace, Menlo, Consolas, monospace;
   --font-small: 0.72rem;
-  --max-content-width: 36rem;
+  --max-content-width: 44rem;
   --pad: 0.5rem;
   --pad-large: 1rem;
   --pad-xlarge: 2rem;
@@ -113,23 +113,45 @@ details pre { margin-top: 0.3rem; }
 button[disabled] { opacity: 0.4; cursor: default; }
 button[disabled]:hover { background: transparent; color: var(--color-primary); }
 
-.filter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem; margin: 0.35rem 0; }
-.filter .label { width: 5.5rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.chip { border-color: transparent; padding: 0.1rem 0.4rem; }
-.chip[aria-pressed=true] { border-color: var(--color-primary); }
+.toolbar { display: flex; gap: var(--pad); align-items: center; flex-wrap: wrap; margin: var(--pad) 0; }
+.toolbar input.inline { flex: 1; }
+.filter-panel { display: flex; flex-wrap: wrap; gap: var(--pad) var(--pad-large); padding: var(--pad) var(--pad-large); margin-bottom: var(--pad);
+  background: rgb(255 255 255 / 0.3); border-radius: 8px; }
+.filter-panel label { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; font-size: var(--font-small); color: var(--color-sub); }
+.filter-panel button { align-self: flex-end; }
 table.inventory { margin-top: var(--pad); }
+pre.mini { font-size: 0.42rem; line-height: 1.15; padding: 0; border: 0; margin: 0 !important; }
+.box { margin: var(--pad-large) 0; padding: var(--pad) var(--pad-large); background: rgb(255 255 255 / 0.3); border-radius: 8px; }
+.box > summary { font-family: var(--monospace); font-size: var(--font-small); }
+.link-row { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; padding: var(--pad) 0; border-bottom: 1px dashed rgb(0 0 0 / 0.12); }
+.link-row select { max-width: 13rem; }
+.arrow { color: var(--color-sub); }
+.field { display: flex; flex-direction: column; gap: 0.25rem; margin: var(--pad) 0; }
+label.check { display: inline; margin: 0; }
+.wish-results { list-style: none; margin-bottom: var(--pad-large) !important; }
+tr.done td { color: var(--color-sub); }
+tr.done a { color: var(--color-sub); text-decoration: line-through; }
 table.inventory td { border-top: 1px dashed rgb(0 0 0 / 0.15); padding-top: 0.35rem; }
 
-button, select {
+/* Buttons and fields: soft edges, a light border, no hard inversion. */
+button, select, input.inline {
+  font-family: var(--monospace);
   font-size: var(--font-small);
-  background: transparent;
+  background: rgb(255 255 255 / 0.4);
   color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  padding: 0.2rem 0.6rem;
-  cursor: pointer;
-  border-radius: 0;
+  border: 1px solid rgb(0 0 0 / 0.18);
+  border-radius: 6px;
+  padding: 0.25rem 0.65rem;
 }
-button:hover { background: var(--color-primary); color: var(--color-bg); }
+button { cursor: pointer; }
+button:hover { background: rgb(0 0 0 / 0.06); }
+button.quiet { background: transparent; border-color: transparent; color: var(--color-sub); }
+button.quiet:hover { color: var(--color-primary); background: rgb(0 0 0 / 0.05); }
+button.danger:hover { color: var(--color-inuse); }
+:focus-visible { outline: 2px solid rgb(22 45 171 / 0.35); outline-offset: 2px; border-radius: 6px; }
+nav a:focus-visible { border-radius: 4px; }
+input.inline { padding: 0.35rem 0.6rem; min-width: 14rem; }
+
 .row { display: flex; gap: var(--pad); align-items: center; flex-wrap: wrap; margin: var(--pad) 0; }
 
 footer { margin-top: 3rem; padding-top: var(--pad-large); border-top: 1px solid var(--color-sub); }

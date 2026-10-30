@@ -163,7 +163,7 @@ plan into a system; --wish adds what's missing to your wishlist.`,
 			}
 			var saved *library.System
 			if save != "" {
-				if saved, err = st.savePlan(save, hops); err != nil {
+				if saved, err = st.savePlan(save, hops, true); err != nil {
 					return err
 				}
 				fmt.Fprintf(w, "\nSaved as system %q; bring it up with `cbl system up %q`.\n", saved.Name, saved.Name)
@@ -193,9 +193,11 @@ plan into a system; --wish adds what's missing to your wishlist.`,
 }
 
 // savePlan turns a plan into a system: one link per step of each distinct
-// route, pinned to the item the plan chose. The first and last step of a
-// route name the device ports; steps between are adapter chains.
-func (st *state) savePlan(name string, hops []smart.Hop) (*library.System, error) {
+// route. With pin, each link is pinned to the item the plan chose; without,
+// links stay open and any available item of the type is used when the
+// system comes up. The first and last step of a route name the device
+// ports; steps between are adapter chains.
+func (st *state) savePlan(name string, hops []smart.Hop, pin bool) (*library.System, error) {
 	s, err := st.db.NewSystem(name, "")
 	if err != nil {
 		return nil, err
@@ -210,7 +212,7 @@ func (st *state) savePlan(name string, hops []smart.Hop) (*library.System, error
 			done = append(done, r)
 			for i, step := range r.Steps {
 				l := library.Link{SystemID: s.ID, PartKey: step.Part.Key}
-				if step.Item != nil {
+				if pin && step.Item != nil {
 					l.Preferred = step.Item.ID
 				}
 				if i == 0 {

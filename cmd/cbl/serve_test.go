@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -213,5 +214,115 @@ func TestServeInventoryAndItemAdd(t *testing.T) {
 	}
 	if out := mustRun(t, "ls"); !strings.Contains(out, "Ethernet cable") {
 		t.Errorf("item added through the page isn't in the inventory:\n%s", out)
+	}
+}
+
+func TestServeSystemBuilder(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "add", "ps2-avmulti", "rca*3")
+	mustRun(t, "device", "add", "ps2", "--name", "PS2")
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	mustRun(t, "device", "add", "mac-mini-m2-2023", "--name", "Mac")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	post := func(path, body string) (int, map[string]any) {
+		t.Helper()
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(body))
+		req.Header.Set("X-CBL", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v map[string]any
+		json.NewDecoder(res.Body).Decode(&v)
+		return res.StatusCode, v
+	}
+
+	// The builder offers catalog-wide cables per port, flagged uncommon.
+	res, _ := http.Get(srv.URL + "/api/builder")
+	var b struct {
+		Devices []struct {
+			Name  string
+			Ports []struct {
+				Label string
+				Fits  []string
+			}
+		}
+		Parts map[string]struct {
+			Uncommon bool
+			Items    []itemView
+		}
+	}
+	json.NewDecoder(res.Body).Decode(&b)
+	res.Body.Close()
+	var hdmiFits []string
+	for _, d := range b.Devices {
+		for _, p := range d.Ports {
+			if d.Name == "Mac" && p.Label == "HDMI" {
+				hdmiFits = p.Fits
+			}
+		}
+	}
+	if !slices.Contains(hdmiFits, "hdmi:m|hdmi:m") || !slices.Contains(hdmiFits, "hdmi:m|mini-hdmi:m") {
+		t.Errorf("Mac HDMI fits = %v, want catalog-wide types", hdmiFits)
+	}
+	if !b.Parts["hdmi:m|mini-hdmi:m"].Uncommon || b.Parts["hdmi:m|hdmi:m"].Uncommon {
+		t.Error("uncommon flags wrong")
+	}
+	if len(b.Parts["ps2-avmulti:m|rca*3:m"].Items) != 1 {
+		t.Error("owned items missing from builder")
+	}
+
+	// Details hidden: planned, links left open.
+	if code, v := post("/api/system/new", `{"name":"Retro","devices":["PS2","CRT"]}`); code != 200 || v["links"] != 1.0 {
+		t.Fatalf("auto system: %d %v", code, v)
+	}
+	if out := mustRun(t, "system", "show", "Retro"); !strings.Contains(out, "PS2 · AV Multi Out → CRT · AV in") || strings.Contains(out, "pinned") {
+		t.Errorf("auto system should have an open link:\n%s", out)
+	}
+	// Details shown: exactly the links given, validated against the ports.
+	if code, _ := post("/api/system/new", `{"name":"Bad","links":[{"part":"hdmi:m|hdmi:m","from_device":"PS2","from_port":"AV Multi Out"}]}`); code != 400 {
+		t.Errorf("HDMI into AV Multi Out accepted: %d", code)
+	}
+	if code, v := post("/api/system/new", `{"name":"Desk","links":[{"part":"hdmi:m|hdmi:m","from_device":"Mac","from_port":"HDMI"}]}`); code != 200 || v["links"] != 1.0 {
+		t.Fatalf("detailed system: %d %v", code, v)
+	}
+	code, v := post("/api/system/link", `{"system":"Desk","part":"trs-3.5:m|trs-3.5:m","from_device":"Mac"}`)
+	if code != 200 || v["from_port"] != "Headphone" {
+		t.Fatalf("add link (port should be filled in): %d %v", code, v)
+	}
+	if code, _ := post("/api/system/unlink", `{"id":"`+v["id"].(string)+`"}`); code != 200 {
+		t.Errorf("unlink: %d", code)
+	}
+	if code, _ := post("/api/system/delete", `{"name":"Desk"}`); code != 200 {
+		t.Errorf("delete: %d", code)
+	}
+	if out := mustRun(t, "system", "ls"); strings.Contains(out, "Desk") || !strings.Contains(out, "Retro") {
+		t.Errorf("after delete:\n%s", out)
+	}
+	if code, _ := post("/api/system/new", `{"name":"Solo","devices":["PS2"]}`); code != 400 {
+		t.Errorf("one device and no links accepted: %d", code)
+	}
+}
+
+func TestServeWishlistUseCase(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "wish", "add", "aux", "rca")
+	mustRun(t, "device", "add", "raspberry-pi-3b", "--name", "Pi")
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	mustRun(t, "connect", "pi", "crt", "--wish")
+	mustRun(t, "wish", "done", "1")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	res, _ := http.Get(srv.URL + "/api/wish")
+	var wishes []struct {
+		UseCase string `json:"use_case"`
+		Done    bool
+	}
+	json.NewDecoder(res.Body).Decode(&wishes)
+	res.Body.Close()
+	if len(wishes) != 2 || wishes[0].UseCase != "-" || !wishes[0].Done || wishes[1].UseCase != "Pi → CRT" || wishes[1].Done {
+		t.Errorf("wishes = %+v", wishes)
 	}
 }

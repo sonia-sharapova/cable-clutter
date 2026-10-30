@@ -23,6 +23,7 @@ import (
 	"github.com/sonia-sharapova/cable-clutter/internal/outline"
 	"github.com/sonia-sharapova/cable-clutter/internal/plan"
 	"github.com/sonia-sharapova/cable-clutter/internal/route"
+	"github.com/sonia-sharapova/cable-clutter/internal/smart"
 )
 
 //go:embed web
@@ -80,6 +81,11 @@ func newServer() http.Handler {
 	mux.HandleFunc("GET /api/wish", api(wishHandler))
 	mux.HandleFunc("GET /api/inventory", api(inventoryHandler))
 	mux.HandleFunc("POST /api/item/add", api(itemAddHandler))
+	mux.HandleFunc("GET /api/builder", api(builderHandler))
+	mux.HandleFunc("POST /api/system/new", api(systemNewHandler))
+	mux.HandleFunc("POST /api/system/link", api(systemLinkHandler))
+	mux.HandleFunc("POST /api/system/unlink", api(systemUnlinkHandler))
+	mux.HandleFunc("POST /api/system/delete", api(systemDeleteHandler))
 	mux.HandleFunc("POST /api/system/up", api(systemUpHandler))
 	mux.HandleFunc("POST /api/system/down", api(systemDownHandler))
 	mux.HandleFunc("POST /api/wish/add", api(wishAddHandler))
@@ -364,13 +370,21 @@ func connectHandler(st *state, r *http.Request) (any, error) {
 }
 
 func wishHandler(st *state, _ *http.Request) (any, error) {
-	wishes, err := st.db.Wishes(false)
+	wishes, err := st.db.Wishes(true)
 	if err != nil {
 		return nil, err
 	}
 	out := []map[string]any{}
 	for _, w := range wishes {
-		out = append(out, map[string]any{"id": w.ID, "name": st.partName(w.PartKey), "part": w.PartKey, "qty": w.Qty, "for": w.System, "notes": w.Notes})
+		// What it's for: the system, else the note (e.g. "PS2 → CRT"), else -.
+		use := w.System
+		if use == "" {
+			use = w.Notes
+		}
+		if use == "" {
+			use = "-"
+		}
+		out = append(out, map[string]any{"id": w.ID, "name": st.partName(w.PartKey), "part": w.PartKey, "qty": w.Qty, "use_case": use, "done": w.Done})
 	}
 	return out, nil
 }
@@ -455,6 +469,7 @@ func inventoryHandler(st *state, _ *http.Request) (any, error) {
 		Categories []string   `json:"categories"`
 		Connectors []connJSON `json:"connectors"`
 		Ends       []string   `json:"ends"`
+		Outline    string     `json:"outline"`
 		Items      []itemView `json:"items"`
 	}
 	rows := []rowJSON{}
@@ -464,7 +479,7 @@ func inventoryHandler(st *state, _ *http.Request) (any, error) {
 			if !ok {
 				continue
 			}
-			row := rowJSON{Key: key, Name: p.Name, Kind: string(p.Kind), Categories: []string{}, Items: viewItems(st.c, in.Owned[key], in)}
+			row := rowJSON{Key: key, Name: p.Name, Kind: string(p.Kind), Categories: []string{}, Outline: outline.Render(st.c, p, ""), Items: viewItems(st.c, in.Owned[key], in)}
 			for _, s := range p.Signals {
 				if cat := category(st.c, s); !contains(row.Categories, cat) {
 					row.Categories = append(row.Categories, cat)
@@ -564,4 +579,212 @@ func wishDoneHandler(st *state, r *http.Request) (any, error) {
 		}
 	}
 	return nil, fmt.Errorf("no open wish %q", req.ID)
+}
+
+// builderHandler is what the system builder offers: each of your devices'
+// ports with every catalog cable or adapter that fits it (not just yours),
+// and the facts the page needs about each part.
+func builderHandler(st *state, _ *http.Request) (any, error) {
+	type portJSON struct {
+		Label string   `json:"label"`
+		End   string   `json:"end"`
+		Dir   string   `json:"dir"`
+		Fits  []string `json:"fits"`
+	}
+	type deviceJSON struct {
+		Name  string     `json:"name"`
+		Model string     `json:"model,omitempty"`
+		Ports []portJSON `json:"ports"`
+	}
+	type partJSON struct {
+		Name      string     `json:"name"`
+		Kind      string     `json:"kind"`
+		Uncommon  bool       `json:"uncommon,omitempty"`
+		Available int        `json:"available"`
+		Items     []itemView `json:"items"`
+	}
+	devices := []deviceJSON{}
+	parts := map[string]partJSON{}
+	for _, d := range st.devices {
+		dj := deviceJSON{Name: d.Nickname, Ports: []portJSON{}}
+		if m, ok := st.c.Devices[d.Model]; ok {
+			dj.Model = m.ID
+			for _, p := range m.Ports {
+				pj := portJSON{Label: p.Label, End: p.End.String(), Dir: p.Dir, Fits: []string{}}
+				for _, f := range st.c.Fits(p) {
+					if f.WrongVoltage {
+						continue
+					}
+					pj.Fits = append(pj.Fits, f.Part.Key)
+					if _, done := parts[f.Part.Key]; !done {
+						in := st.inv.Of(st.c, f.Part.Key)
+						items := in.Owned[f.Part.Key]
+						free := 0
+						for _, it := range items {
+							if in.Status[it.ID] == library.Free {
+								free++
+							}
+						}
+						parts[f.Part.Key] = partJSON{f.Part.Name, string(f.Part.Kind), st.c.Uncommon(f.Part), free, viewItems(st.c, items, in)}
+					}
+				}
+				dj.Ports = append(dj.Ports, pj)
+			}
+		}
+		devices = append(devices, dj)
+	}
+	return map[string]any{"devices": devices, "parts": parts}, nil
+}
+
+// linkRequest is one cable in a system: a part type, optionally one of your
+// items, and the device ports it joins (ports may be left out).
+type linkRequest struct {
+	Part       string `json:"part"`
+	Item       string `json:"item"`
+	FromDevice string `json:"from_device"`
+	FromPort   string `json:"from_port"`
+	ToDevice   string `json:"to_device"`
+	ToPort     string `json:"to_port"`
+}
+
+// link checks a requested link and turns it into one for system s.
+func (st *state) link(s string, req linkRequest) (library.Link, error) {
+	l := library.Link{SystemID: s, PartKey: req.Part, Preferred: req.Item}
+	if _, ok := st.c.Part(req.Part); !ok {
+		return l, fmt.Errorf("no cable or adapter type %q", req.Part)
+	}
+	if req.Item != "" && st.item(req.Item) == nil {
+		return l, fmt.Errorf("no item %q", req.Item)
+	}
+	spec := func(device, port string) string {
+		if device == "" || port == "" {
+			return device
+		}
+		return device + ":" + port
+	}
+	var err error
+	if l.FromDevice, l.FromPort, err = st.endpoint(spec(req.FromDevice, req.FromPort), req.Part); err != nil {
+		return l, err
+	}
+	l.ToDevice, l.ToPort, err = st.endpoint(spec(req.ToDevice, req.ToPort), req.Part)
+	return l, err
+}
+
+// systemNewHandler creates a system. With links, it uses exactly those.
+// Without, it plans the chain of devices and saves the links open: any
+// available cable of each type is used when the system is switched on.
+func systemNewHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Name    string        `json:"name"`
+		Devices []string      `json:"devices"`
+		Links   []linkRequest `json:"links"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, errors.New("give the system a name")
+	}
+	if len(req.Links) > 0 {
+		var links []library.Link
+		for _, lr := range req.Links {
+			l, err := st.link("", lr)
+			if err != nil {
+				return nil, err
+			}
+			links = append(links, l)
+		}
+		s, err := st.db.NewSystem(req.Name, "")
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range links {
+			l.SystemID = s.ID
+			if _, err := st.db.AddLink(l); err != nil {
+				return nil, err
+			}
+		}
+		return map[string]any{"name": s.Name, "links": len(links)}, nil
+	}
+
+	if len(req.Devices) < 2 {
+		return nil, errors.New("pick at least two devices, or open the details and add the cables yourself")
+	}
+	var chain []smart.Device
+	for _, name := range req.Devices {
+		d, err := st.ownedDevice(name)
+		if err != nil {
+			return nil, err
+		}
+		chain = append(chain, d)
+	}
+	hops := smart.Chain(st.c, chain, st.inv, route.Options{})
+	for _, h := range hops {
+		if len(h.Routes) == 0 {
+			return nil, fmt.Errorf("no way to connect %s to %s, even buying parts", h.From.Nickname, h.To.Nickname)
+		}
+	}
+	s, err := st.savePlan(req.Name, hops, false)
+	if err != nil {
+		return nil, err
+	}
+	links, _ := st.db.Links()
+	return map[string]any{"name": s.Name, "links": len(links[s.ID])}, nil
+}
+
+func systemLinkHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		System string `json:"system"`
+		linkRequest
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	s, err := st.system(req.System)
+	if err != nil {
+		return nil, err
+	}
+	l, err := st.link(s.ID, req.linkRequest)
+	if err != nil {
+		return nil, err
+	}
+	added, err := st.db.AddLink(l)
+	if err != nil {
+		return nil, err
+	}
+	return linkView(added), nil
+}
+
+func systemUnlinkHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	for _, s := range st.systems {
+		for _, l := range st.links[s.ID] {
+			if l.ID == req.ID {
+				if s.Active {
+					return nil, fmt.Errorf("%q is on; switch it off first", s.Name)
+				}
+				return map[string]string{"removed": l.ID}, st.db.RemoveLink(l.ID)
+			}
+		}
+	}
+	return nil, fmt.Errorf("no link %q", req.ID)
+}
+
+func systemDeleteHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	s, err := st.system(req.Name)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{"removed": s.ID}, st.db.RemoveSystem(s)
 }

@@ -187,3 +187,15 @@ func BenchmarkLoad(b *testing.B) {
 		load(b)
 	}
 }
+
+func TestUncommon(t *testing.T) {
+	c := load(t)
+	if !c.Connectors["scart"].Uncommon || c.Connectors["usb-c"].Uncommon {
+		t.Error("uncommon flags not loaded")
+	}
+	scart, _ := c.Part("scart:m|scart:m")
+	usb, _ := c.Part("usb-a:m|usb-c:m")
+	if !c.Uncommon(scart) || c.Uncommon(usb) {
+		t.Error("Uncommon(part) wrong")
+	}
+}
