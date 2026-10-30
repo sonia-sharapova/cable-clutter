@@ -22,7 +22,15 @@ function el(tag, attrs, ...children) {
     if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else n.setAttribute(k, v === true ? "" : v);
   }
-  for (const c of children.flat()) {
+  return fill(n, ...children);
+}
+
+// fill replaces a node's children. Children may be nested arrays; null and
+// false are skipped. Always use this, never replaceChildren directly: that
+// would print nested arrays as "[object HTMLElement]".
+function fill(n, ...children) {
+  n.replaceChildren();
+  for (const c of children.flat(Infinity)) {
     if (c == null || c === false) continue;
     n.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
@@ -107,7 +115,7 @@ function search() {
     ? `${hits.length} result${hits.length === 1 ? "" : "s"} in ${ms.toFixed(3)} ms · 1 hashmap lookup of ${index.keys.toLocaleString()} prefixes`
     : `${index.entries.length} things indexed as ${index.keys.toLocaleString()} prefixes in ${index.ms.toFixed(1)} ms`;
   const list = $("#results");
-  list.replaceChildren(
+  fill(list,
     ...hits.slice(0, 60).map((i, n) => {
       const e = index.entries[i];
       return el("li", { "aria-selected": n === 0 ? "true" : "false", onclick: () => openEntry(e.id) },
@@ -152,11 +160,11 @@ async function route() {
   }
   const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, connect: showConnect, systems: showSystems, wish: showWish }[kind];
   if (!render) return;
-  view.replaceChildren(el("p", { class: "meta" }, "…"));
+  fill(view, el("p", { class: "meta" }, "…"));
   try {
-    view.replaceChildren(el("a", { href: "#", class: "back meta" }, "← search"), ...(await render(arg)));
+    fill(view, el("a", { href: "#", class: "back meta" }, "← search"), await render(arg));
   } catch (err) {
-    view.replaceChildren(el("a", { href: "#", class: "back meta" }, "← search"), el("p", { class: "warn" }, err.message));
+    fill(view, el("a", { href: "#", class: "back meta" }, "← search"), el("p", { class: "warn" }, err.message));
   }
 }
 
@@ -228,7 +236,7 @@ async function showSystem(name) {
     await refresh();
     if (res.up === d.up) {
       // Didn't come up: say why, and offer to switch.
-      msg.replaceChildren(
+      fill(msg,
         ...(res.missing || []).map((m) => el("p", { class: "warn" }, "Missing: " + m)),
         ...(res.blocked || []).map((b) => el("p", { class: "warn" }, b)),
         res.blocked && res.blocked.length ? el("button", { onclick: () => toggle(true) }, "Take those down and bring this up") : null);
@@ -266,35 +274,73 @@ async function showSystems() {
 
 async function showConnect() {
   const out = el("div", {});
-  const pick = (id) => el("select", { id }, index.devices.map((d) => el("option", {}, d)));
-  const from = pick("from"), to = pick("to");
+  const pick = () => el("select", {}, index.devices.map((d) => el("option", {}, d)));
+  const from = pick(), to = pick();
   if (index.devices.length > 1) to.selectedIndex = 1;
   const go = async () => {
-    out.replaceChildren(el("p", { class: "meta" }, "…"));
+    fill(out, el("p", { class: "meta" }, "…"));
     const d = await api(`/api/connect?from=${encodeURIComponent(from.value)}&to=${encodeURIComponent(to.value)}`);
-    const kinds = ["video", "audio", "data"].filter((k) => d.routes[k]);
-    out.replaceChildren(
-      kinds.length ? null : el("p", {}, `No way to connect ${d.from} and ${d.to} within 3 cables and adapters.`),
-      kinds.map((k) => {
-        const r = d.routes[k];
-        return [
-          el("h3", {}, k.toUpperCase(), " ", el("span", { class: "meta" }, d.signal_names[r.signal])),
-          el("ul", {},
-            el("li", { class: "meta" }, `${d.from} · ${r.from_port}`),
-            r.steps.map((s) => el("li", { class: s.buy ? "cant" : "can" },
-              s.buy ? "★ need: " : "→ ", el("a", { href: "#part/" + encodeURIComponent(s.part.key) }, s.part.name),
-              el("span", { class: "meta" }, s.buy ? "" : ` #${shortId(s.item)}${s.busy_in ? ` (in use by ${s.busy_in})` : " free"}`))),
-            el("li", { class: "meta" }, `${d.to} · ${r.to_port}`)),
-        ];
-      }),
-      d.to_buy && d.to_buy.length ? el("p", {}, "To buy: ", d.to_buy.join(", ")) : kinds.length ? el("p", { class: "can" }, "Everything needed is in your inventory.") : null,
-    );
+    fill(out, connectResult(d));
   };
+  from.addEventListener("change", () => fill(out));
+  to.addEventListener("change", () => fill(out));
   return [
     el("h2", {}, "Connect"),
+    el("p", { class: "meta" }, "From one device's outputs to the other's inputs: free cables first, then busy ones, then what to buy."),
     el("div", { class: "row" }, from, el("span", {}, "→"), to, el("button", { onclick: go }, "Find a way")),
     out,
   ];
+}
+
+function connectResult(d) {
+  const kinds = ["video", "audio", "data"].filter((k) => d.routes[k]);
+  if (!kinds.length) {
+    return el("p", { class: "summary" }, `No way to connect ${d.from} to ${d.to} within 3 cables and adapters, even buying parts.`);
+  }
+  const buy = d.to_buy || [];
+  const summary = el("p", { class: "summary" },
+    `${d.from} → ${d.to}: `, kinds.join(", "), ". ",
+    buy.length ? el("span", { class: "cant" }, `Needs ${buy.length} purchase${buy.length > 1 ? "s" : ""}.`) : el("span", { class: "can" }, "Everything needed is yours."));
+
+  const shown = [];
+  const sections = kinds.map((k) => {
+    const r = d.routes[k];
+    const head = el("h3", { class: "kind-head" }, k.toUpperCase(), " ", el("span", { class: "meta" }, d.signal_names[r.signal]));
+    const same = shown.find((s) => sameSteps(s.route, r));
+    if (same) return el("section", { class: "route" }, head, el("p", { class: "meta" }, `Same cables as ${same.kind}.`));
+    shown.push({ kind: k, route: r });
+    return el("section", { class: "route" }, head,
+      el("ol", { class: "chain" },
+        el("li", { class: "end" }, el("strong", {}, d.from), el("span", { class: "meta" }, " · " + r.from_port)),
+        r.steps.map((s) => el("li", { class: s.buy ? "step need" : "step" },
+          el("a", { href: "#part/" + encodeURIComponent(s.part.key) }, s.part.name), " ",
+          s.buy ? el("span", { class: "tag need" }, "need") : el("span", { class: "status " + (s.busy_in ? "inuse" : "free") }, s.busy_in ? `#${shortId(s.item)} in use by ${s.busy_in}` : `#${shortId(s.item)} free`),
+          d.outlines[s.part.key] ? el("details", {}, el("summary", { class: "meta" }, "outline"), el("pre", {}, d.outlines[s.part.key])) : null)),
+        el("li", { class: "end" }, el("strong", {}, d.to), el("span", { class: "meta" }, " · " + r.to_port))));
+  });
+
+  const shop = buy.length
+    ? el("div", { class: "shop" },
+        el("p", {}, "To buy:"),
+        el("ul", {}, buy.map((p) => el("li", {}, "★ ", el("a", { href: "#part/" + encodeURIComponent(p.key) }, p.name)))),
+        wishButton(buy, `${d.from} → ${d.to}`))
+    : null;
+  return [summary, sections, shop];
+}
+
+const sameSteps = (a, b) => a.from_port === b.from_port && a.to_port === b.to_port &&
+  a.steps.length === b.steps.length && a.steps.every((s, i) => s.part.key === b.steps[i].part.key);
+
+function wishButton(parts, note) {
+  const button = el("button", {
+    onclick: async () => {
+      const res = await api("/api/wish/add", { parts: parts.map((p) => p.key), note });
+      fill(button.parentNode.querySelector(".wished") || button.parentNode.appendChild(el("p", { class: "meta wished" })),
+        res.added.length ? `Added ${res.added.length} to your wishlist.` : "Already on your wishlist.");
+      button.disabled = true;
+    },
+  }, "Add to wishlist");
+  return button;
 }
 
 async function showWish() {
@@ -326,7 +372,7 @@ function footer(bytes) {
   const used = c["in use"] || 0;
   const cells = 24;
   const n = total ? Math.round((used / total) * cells) : 0;
-  $("#meter").replaceChildren(
+  fill($("#meter"),
     "Cables in use ",
     el("span", { class: "cells" }, el("span", { class: "used" }, "▮".repeat(n)), "▯".repeat(cells - n)),
     ` ${used} of ${total} · ${c.devices || 0} devices`);

@@ -113,3 +113,56 @@ func TestServe(t *testing.T) {
 		t.Errorf("wish done: %d %v", code, v)
 	}
 }
+
+func TestServeConnectAndWishAdd(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "raspberry-pi-3b", "--name", "Pi")
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+
+	res, err := http.Get(srv.URL + "/api/connect?from=Pi&to=CRT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d struct {
+		ToBuy    []struct{ Key, Name string } `json:"to_buy"`
+		Outlines map[string]string            `json:"outlines"`
+	}
+	json.NewDecoder(res.Body).Decode(&d)
+	res.Body.Close()
+	if len(d.ToBuy) == 0 || d.ToBuy[0].Key == "" || d.Outlines[d.ToBuy[0].Key] == "" {
+		t.Fatalf("connect: to_buy %v, outlines for %d parts", d.ToBuy, len(d.Outlines))
+	}
+
+	add := func() []any {
+		req, _ := http.NewRequest("POST", srv.URL+"/api/wish/add", strings.NewReader(`{"parts":["`+d.ToBuy[0].Key+`"],"note":"Pi → CRT"}`))
+		req.Header.Set("X-CBL", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v struct{ Added []any }
+		json.NewDecoder(res.Body).Decode(&v)
+		return v.Added
+	}
+	if got := add(); len(got) != 1 {
+		t.Errorf("first add: %v", got)
+	}
+	if got := add(); len(got) != 0 {
+		t.Errorf("second add should skip the existing wish: %v", got)
+	}
+}
+
+// The page builds nested child lists; DOM replaceChildren prints those as
+// "[object HTMLElement]". Everything must go through fill(), which flattens.
+func TestPageRendersThroughFill(t *testing.T) {
+	js, err := webFiles.ReadFile("web/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(js), ".replaceChildren("); n != 1 {
+		t.Errorf("app.js calls replaceChildren %d times; only fill() may", n)
+	}
+}

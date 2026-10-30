@@ -88,6 +88,31 @@ td, th { padding: 0.2rem var(--pad) 0.2rem 0; vertical-align: top; }
 .warn { color: var(--color-inuse); }
 .note { font-style: italic; }
 
+.summary { font-size: 1.05rem; margin: var(--pad-large) 0; }
+.route { margin: var(--pad-large) 0 var(--pad-xlarge); }
+.kind-head { font-family: var(--monospace); font-size: var(--font-small) !important; letter-spacing: 0.08em; }
+
+/* A route drawn as a wire: devices at the ends, a stop per cable. */
+ol.chain { list-style: none; margin: var(--pad) 0 0 0.45rem; padding-left: 1.2rem; border-left: 2px solid var(--color-primary); }
+ol.chain li { position: relative; padding: 0.35rem 0; }
+ol.chain li::before {
+  content: ""; position: absolute; left: calc(-1.2rem - 7px); top: 0.7rem;
+  width: 8px; height: 8px; border: 2px solid var(--color-primary); border-radius: 50%; background: var(--color-bg);
+}
+ol.chain li.end::before { border-radius: 0; background: var(--color-primary); }
+ol.chain li.need::before { border-color: var(--color-inuse); border-style: dashed; }
+ol.chain li.need > a { color: var(--color-inuse); }
+ol.chain .status { margin-left: 0.3rem; }
+.tag { font-family: var(--monospace); font-size: var(--font-small); text-transform: uppercase; letter-spacing: 0.08em; }
+.tag.need { color: var(--color-inuse); border: 1px dashed var(--color-inuse); padding: 0 0.3rem; }
+details { margin-top: 0.2rem; }
+details summary { cursor: pointer; }
+details pre { margin-top: 0.3rem; }
+.shop { border: 1px dashed var(--color-inuse); padding: var(--pad) var(--pad-large); margin: var(--pad-large) 0; }
+.shop ul { margin: var(--pad) 0 !important; }
+button[disabled] { opacity: 0.4; cursor: default; }
+button[disabled]:hover { background: transparent; color: var(--color-primary); }
+
 button, select {
   font-size: var(--font-small);
   background: transparent;

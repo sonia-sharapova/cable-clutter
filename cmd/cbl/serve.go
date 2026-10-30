@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -79,6 +80,7 @@ func newServer() http.Handler {
 	mux.HandleFunc("GET /api/wish", api(wishHandler))
 	mux.HandleFunc("POST /api/system/up", api(systemUpHandler))
 	mux.HandleFunc("POST /api/system/down", api(systemDownHandler))
+	mux.HandleFunc("POST /api/wish/add", api(wishAddHandler))
 	mux.HandleFunc("POST /api/wish/done", api(wishDoneHandler))
 	return mux
 }
@@ -334,11 +336,21 @@ func connectHandler(st *state, r *http.Request) (any, error) {
 		return nil, err
 	}
 	routes := route.Connect(st.c, a, b, st.inv, route.Options{})
-	var buy []string
-	for _, rt := range routes {
-		for _, p := range rt.Buy() {
-			if !contains(buy, p.Name) {
-				buy = append(buy, p.Name)
+	type buyJSON struct {
+		Key  string `json:"key"`
+		Name string `json:"name"`
+	}
+	buy := []buyJSON{}
+	outlines := map[string]string{}
+	for _, kind := range []string{"video", "audio", "data"} {
+		rt, ok := routes[kind]
+		if !ok {
+			continue
+		}
+		for _, s := range rt.Steps {
+			outlines[s.Part.Key] = outline.Render(st.c, s.Part, "")
+			if s.Item == nil && !slices.ContainsFunc(buy, func(b buyJSON) bool { return b.Key == s.Part.Key }) {
+				buy = append(buy, buyJSON{s.Part.Key, s.Part.Name})
 			}
 		}
 	}
@@ -346,7 +358,7 @@ func connectHandler(st *state, r *http.Request) (any, error) {
 	for id, s := range st.c.Signals {
 		signals[id] = s.Name
 	}
-	return map[string]any{"from": aName, "to": bName, "routes": routesJSON(routes), "to_buy": buy, "signal_names": signals}, nil
+	return map[string]any{"from": aName, "to": bName, "routes": routesJSON(routes), "to_buy": buy, "outlines": outlines, "signal_names": signals}, nil
 }
 
 func wishHandler(st *state, _ *http.Request) (any, error) {
@@ -413,6 +425,34 @@ func systemDownHandler(st *state, r *http.Request) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"up": false}, st.db.TakeDown(s.ID)
+}
+
+// wishAddHandler adds parts to the wishlist, skipping any already wished for.
+func wishAddHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Parts []string `json:"parts"`
+		Note  string   `json:"note"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	added := []string{}
+	for _, key := range req.Parts {
+		if _, ok := st.c.Part(key); !ok {
+			return nil, fmt.Errorf("no cable or adapter type %q", key)
+		}
+		wanted, err := st.db.Wanted(key)
+		if err != nil {
+			return nil, err
+		}
+		if !wanted {
+			if err := st.db.AddWish(key, 1, "", req.Note); err != nil {
+				return nil, err
+			}
+			added = append(added, key)
+		}
+	}
+	return map[string]any{"added": added}, nil
 }
 
 func wishDoneHandler(st *state, r *http.Request) (any, error) {
