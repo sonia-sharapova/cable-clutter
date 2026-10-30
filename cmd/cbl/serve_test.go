@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/sonia-sharapova/cable-clutter/internal/library"
 )
 
 func TestServe(t *testing.T) {
@@ -460,5 +462,112 @@ func TestServeExplore(t *testing.T) {
 	}
 	if owned != 2 { // the cable shows under both of its connectors
 		t.Errorf("owned count across connectors = %d, want 2", owned)
+	}
+}
+
+func TestServeSystemDevices(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "mac-mini-m2-2023", "--name", "Mac")
+	mustRun(t, "device", "add", "dell-monitor", "--name", "Monitor")
+	mustRun(t, "device", "add", "te-ob-4", "--name", "Speaker")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	post := func(path, body string) (int, map[string]any) {
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(body))
+		req.Header.Set("X-CBL", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v map[string]any
+		json.NewDecoder(res.Body).Decode(&v)
+		return res.StatusCode, v
+	}
+	if code, v := post("/api/system/new", `{"name":"Desk","devices":["Mac","Monitor"]}`); code != 200 {
+		t.Fatalf("new: %d %v", code, v)
+	}
+	// The speaker takes the Mac's sound in: found by trying the other way round.
+	if code, v := post("/api/system/add-device", `{"system":"Desk","device":"Speaker","to":"Mac"}`); code != 200 {
+		t.Fatalf("add speaker: %d %v", code, v)
+	}
+	if out := mustRun(t, "system", "show", "Desk"); !strings.Contains(out, "Speaker") {
+		t.Fatalf("speaker not in the system:\n%s", out)
+	}
+	if code, v := post("/api/system/remove-device", `{"system":"Desk","device":"Speaker"}`); code != 200 || v["removed"].(float64) < 1 {
+		t.Fatalf("remove speaker: %d %v", code, v)
+	}
+	out := mustRun(t, "system", "show", "Desk")
+	if strings.Contains(out, "Speaker") || !strings.Contains(out, "Monitor") {
+		t.Errorf("after removing the speaker:\n%s", out)
+	}
+	if code, _ := post("/api/system/remove-device", `{"system":"Desk","device":"Speaker"}`); code != 400 {
+		t.Error("removing a device that isn't there should fail")
+	}
+}
+
+func TestLinkChains(t *testing.T) {
+	l := func(id, from, to string) *library.Link { return &library.Link{ID: id, FromDevice: from, ToDevice: to} }
+	got := linkChains([]*library.Link{
+		l("1", "Mac", ""), l("2", "", ""), l("3", "", "Monitor"), // a planned route through an adapter
+		l("4", "Mac", "Speaker"), // a manual one-cable link
+		l("5", "", ""),           // a cable left open at both ends
+	})
+	var ids []string
+	for _, c := range got {
+		s := ""
+		for _, x := range c {
+			s += x.ID
+		}
+		ids = append(ids, s)
+	}
+	if strings.Join(ids, ",") != "123,4,5" {
+		t.Errorf("chains = %v, want 123,4,5", ids)
+	}
+}
+
+// A wired keyboard and mouse plug straight into the Pi: no cables to own,
+// and the system still comes up.
+func TestServeDirectPlugIn(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "raspberry-pi-3b", "--name", "Pi", "--owner", "Alex")
+	mustRun(t, "device", "add", "dell-monitor", "--name", "Monitor")
+	mustRun(t, "device", "add", "generic-usb-keyboard", "--name", "Keyboard")
+	mustRun(t, "add", "hdmi", "hdmi")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	post := func(path, body string) (int, map[string]any) {
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(body))
+		req.Header.Set("X-CBL", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var v map[string]any
+		json.NewDecoder(res.Body).Decode(&v)
+		return res.StatusCode, v
+	}
+	// A mouse you don't know the model of: ports from the generic type.
+	if code, v := post("/api/custom/add", `{"kind":"device","name":"Old mouse","generic":"generic-usb-mouse","owner":"Alex"}`); code != 200 {
+		t.Fatalf("generic mouse: %d %v", code, v)
+	}
+	if code, v := post("/api/system/new", `{"name":"Pi desk","devices":["Pi","Monitor"]}`); code != 200 {
+		t.Fatalf("new: %d %v", code, v)
+	}
+	for _, dev := range []string{"Keyboard", "Old mouse"} {
+		if code, v := post("/api/system/add-device", `{"system":"Pi desk","device":"`+dev+`","to":"Pi"}`); code != 200 {
+			t.Fatalf("add %s: %d %v", dev, code, v)
+		}
+	}
+	out := mustRun(t, "system", "show", "Pi desk")
+	if strings.Count(out, "plugs straight in") != 2 {
+		t.Errorf("want two direct links:\n%s", out)
+	}
+	if code, v := post("/api/system/up", `{"name":"Pi desk"}`); code != 200 || v["up"] != true {
+		t.Errorf("switch on: %d %v", code, v)
+	}
+	if out := mustRun(t, "device", "ls"); !strings.Contains(out, "Alex") {
+		t.Errorf("owner missing from device ls:\n%s", out)
 	}
 }

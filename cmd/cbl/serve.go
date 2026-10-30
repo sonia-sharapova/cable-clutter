@@ -86,11 +86,16 @@ func newServer() http.Handler {
 	mux.HandleFunc("POST /api/system/link", api(systemLinkHandler))
 	mux.HandleFunc("POST /api/system/unlink", api(systemUnlinkHandler))
 	mux.HandleFunc("POST /api/system/delete", api(systemDeleteHandler))
+	mux.HandleFunc("POST /api/system/add-device", api(systemAddDeviceHandler))
+	mux.HandleFunc("POST /api/system/remove-device", api(systemRemoveDeviceHandler))
 	mux.HandleFunc("POST /api/system/up", api(systemUpHandler))
 	mux.HandleFunc("POST /api/system/down", api(systemDownHandler))
 	mux.HandleFunc("POST /api/wish/add", api(wishAddHandler))
 	mux.HandleFunc("POST /api/wish/done", api(wishDoneHandler))
 	mux.HandleFunc("GET /api/explore", api(exploreHandler))
+	mux.HandleFunc("GET /api/devices", api(devicesHandler))
+	mux.HandleFunc("POST /api/device/add", api(deviceAddHandler))
+	mux.HandleFunc("POST /api/device/owner", api(deviceOwnerHandler))
 	mux.HandleFunc("GET /api/parts-kit", api(partsKitHandler))
 	mux.HandleFunc("POST /api/custom/add", api(customAddHandler))
 	mux.HandleFunc("GET /api/bookmarks", api(bookmarksHandler))
@@ -317,6 +322,9 @@ func deviceHandler(st *state, r *http.Request) (any, error) {
 		signals[id] = s.Name
 	}
 	out["signal_names"] = signals
+	if found := library.FindDevices(st.devices, nickname); len(found) == 1 {
+		out["owner"] = found[0].Owner
+	}
 	return out, nil
 }
 
@@ -865,7 +873,13 @@ func partsKitHandler(st *state, _ *http.Request) (any, error) {
 		}
 		return signals[i].Name < signals[j].Name
 	})
-	return map[string]any{"connectors": connectors, "signals": signals}, nil
+	generics := []option{}
+	for _, m := range st.c.DeviceModels() {
+		if m.Generic {
+			generics = append(generics, option{m.ID, strings.TrimSuffix(m.Name, " (generic)"), m.Category})
+		}
+	}
+	return map[string]any{"connectors": connectors, "signals": signals, "generics": generics}, nil
 }
 
 // customAddHandler adds a cable, adapter or device the catalog doesn't
@@ -875,6 +889,10 @@ func customAddHandler(st *state, r *http.Request) (any, error) {
 		Kind string `json:"kind"` // cable, adapter or device
 		catalog.CustomPart
 		Ports    []catalog.CustomPort `json:"ports"`
+		Generic  string               `json:"generic"` // a generic model to take the ports from
+		Make     string               `json:"make"`
+		Wireless string               `json:"wireless"`
+		Owner    string               `json:"owner"`
 		Qty      int                  `json:"qty"`
 		Location string               `json:"location"`
 		Nickname string               `json:"nickname"`
@@ -903,9 +921,25 @@ func customAddHandler(st *state, r *http.Request) (any, error) {
 		}
 		return map[string]any{"kind": req.Kind, "key": key, "name": req.Name, "added": len(added)}, nil
 	case "device":
-		d := catalog.CustomDevice{ID: customDeviceID(st.c, req.Name), Name: req.Name, Ports: req.Ports}
+		d := catalog.CustomDevice{ID: customDeviceID(st.c, req.Name), Name: req.Name, Make: strings.TrimSpace(req.Make),
+			Wireless: strings.TrimSpace(req.Wireless), Ports: req.Ports}
 		if req.Name == "" {
 			return nil, errors.New("give the device a name")
+		}
+		if req.Generic != "" {
+			// You don't know its ports: assume a typical one of its kind.
+			g, ok := st.c.Devices[req.Generic]
+			if !ok || !g.Generic {
+				return nil, fmt.Errorf("no generic device type %q", req.Generic)
+			}
+			d.Category, d.Ports = g.Category, nil
+			if d.Wireless == "" {
+				d.Wireless = g.Wireless
+			}
+			d.Assumption = "ports of a typical " + strings.ToLower(strings.TrimSuffix(g.Name, " (generic)")) + ": " + g.Assumption
+			for _, p := range g.Ports {
+				d.Ports = append(d.Ports, catalog.CustomPort{Label: p.Label, End: p.End.String(), Qty: p.Qty, Dir: p.Dir, Signals: p.Signals, Volts: p.Volts})
+			}
 		}
 		if err := st.c.CheckDevice(d); err != nil {
 			return nil, err
@@ -921,6 +955,11 @@ func customAddHandler(st *state, r *http.Request) (any, error) {
 		dev, _, err := st.db.AddDevice(d.ID, nickname, "")
 		if err != nil {
 			return nil, err
+		}
+		if req.Owner != "" {
+			if err := st.db.SetOwner(dev.ID, req.Owner); err != nil {
+				return nil, err
+			}
 		}
 		return map[string]any{"kind": "device", "model": d.ID, "name": dev.Nickname}, nil
 	}
@@ -989,4 +1028,186 @@ func exploreHandler(st *state, _ *http.Request) (any, error) {
 		out = append(out, familyJSON{f, conns})
 	}
 	return out, nil
+}
+
+// systemAddDeviceHandler plugs another of your devices into a system: it
+// plans the cables between it and a device already there, trying the new
+// one's outputs first (a keyboard into a computer), then its inputs (a
+// computer into a speaker).
+func systemAddDeviceHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		System string `json:"system"`
+		Device string `json:"device"`
+		To     string `json:"to"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	s, err := st.system(req.System)
+	if err != nil {
+		return nil, err
+	}
+	if s.Active {
+		return nil, fmt.Errorf("%q is on; switch it off first", s.Name)
+	}
+	a, err := st.ownedDevice(req.Device)
+	if err != nil {
+		return nil, err
+	}
+	b, err := st.ownedDevice(req.To)
+	if err != nil {
+		return nil, err
+	}
+	found := func(hops []smart.Hop) bool { return len(hops) > 0 && len(hops[0].Routes) > 0 }
+	hops := smart.Chain(st.c, []smart.Device{a, b}, st.inv, route.Options{})
+	if !found(hops) {
+		hops = smart.Chain(st.c, []smart.Device{b, a}, st.inv, route.Options{})
+	}
+	if !found(hops) {
+		return nil, fmt.Errorf("no way to connect %s and %s, even buying parts", a.Nickname, b.Nickname)
+	}
+	if err := st.addHops(s, hops, false); err != nil {
+		return nil, err
+	}
+	return map[string]string{"added": a.Nickname}, nil
+}
+
+// systemRemoveDeviceHandler takes a device out of a system with every
+// cable chain that reaches it, adapters in the middle included.
+func systemRemoveDeviceHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		System string `json:"system"`
+		Device string `json:"device"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	s, err := st.system(req.System)
+	if err != nil {
+		return nil, err
+	}
+	if s.Active {
+		return nil, fmt.Errorf("%q is on; switch it off first", s.Name)
+	}
+	removed := 0
+	for _, chain := range linkChains(st.links[s.ID]) {
+		if !slices.ContainsFunc(chain, func(l *library.Link) bool {
+			return strings.EqualFold(l.FromDevice, req.Device) || strings.EqualFold(l.ToDevice, req.Device)
+		}) {
+			continue
+		}
+		for _, l := range chain {
+			if err := st.db.RemoveLink(l.ID); err != nil {
+				return nil, err
+			}
+			removed++
+		}
+	}
+	if removed == 0 {
+		return nil, fmt.Errorf("%q isn't in %q", req.Device, s.Name)
+	}
+	return map[string]int{"removed": removed}, nil
+}
+
+// linkChains groups a system's links, in the order they were saved, into
+// chains: a planned route saves its first link with where it starts and its
+// last with where it ends, the ones between with neither.
+func linkChains(links []*library.Link) [][]*library.Link {
+	var chains [][]*library.Link
+	var cur []*library.Link
+	for _, l := range links {
+		if l.FromDevice != "" && len(cur) > 0 {
+			chains, cur = append(chains, cur), nil
+		}
+		cur = append(cur, l)
+		if l.ToDevice != "" {
+			chains, cur = append(chains, cur), nil
+		}
+	}
+	if len(cur) > 0 {
+		chains = append(chains, cur)
+	}
+	return chains
+}
+
+// devicesHandler is your devices with make, model and owner, and every
+// catalog model you could add, named ones first, then generic types.
+func devicesHandler(st *state, _ *http.Request) (any, error) {
+	type modelJSON struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Make     string `json:"make,omitempty"`
+		Category string `json:"category,omitempty"`
+		Generic  bool   `json:"generic,omitempty"`
+	}
+	type deviceJSON struct {
+		Name  string    `json:"name"`
+		Owner string    `json:"owner"`
+		Model modelJSON `json:"model"`
+	}
+	view := func(m *catalog.DeviceModel) modelJSON { return modelJSON{m.ID, m.Name, m.Make, m.Category, m.Generic} }
+	devices := []deviceJSON{}
+	for _, d := range st.devices {
+		dj := deviceJSON{Name: d.Nickname, Owner: d.Owner}
+		if m, ok := st.c.Devices[d.Model]; ok {
+			dj.Model = view(m)
+		}
+		devices = append(devices, dj)
+	}
+	models := []modelJSON{}
+	for _, m := range st.c.DeviceModels() {
+		models = append(models, view(m))
+	}
+	sort.SliceStable(models, func(i, j int) bool {
+		if models[i].Generic != models[j].Generic {
+			return !models[i].Generic
+		}
+		return strings.ToLower(models[i].Name) < strings.ToLower(models[j].Name)
+	})
+	return map[string]any{"devices": devices, "models": models}, nil
+}
+
+// deviceAddHandler records a device you own from a catalog model.
+func deviceAddHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Model    string `json:"model"`
+		Nickname string `json:"nickname"`
+		Owner    string `json:"owner"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	m, ok := st.c.Devices[req.Model]
+	if !ok {
+		return nil, fmt.Errorf("no device model %q", req.Model)
+	}
+	name := strings.TrimSpace(req.Nickname)
+	if name == "" {
+		name = m.Name
+	}
+	d, _, err := st.db.AddDevice(m.ID, name, "")
+	if err != nil {
+		return nil, err
+	}
+	if req.Owner != "" {
+		if err := st.db.SetOwner(d.ID, req.Owner); err != nil {
+			return nil, err
+		}
+	}
+	return map[string]string{"name": d.Nickname}, nil
+}
+
+func deviceOwnerHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Name  string `json:"name"`
+		Owner string `json:"owner"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	found := library.FindDevices(st.devices, req.Name)
+	if len(found) != 1 {
+		return nil, fmt.Errorf("no single device called %q", req.Name)
+	}
+	return map[string]string{"owner": req.Owner}, st.db.SetOwner(found[0].ID, req.Owner)
 }

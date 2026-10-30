@@ -2,6 +2,7 @@
 # not just plug shapes.
 signals:
   - {id: usb.2.0, kind: data, name: "USB 2.0 data (480 Mb/s)"}
+  - {id: midi, kind: data, name: "MIDI (notes and control)"}
   - {id: usb.3.0, kind: data, name: "USB 3.0 / 3.2 Gen 1 data (5 Gb/s)"}
   - {id: usb4, kind: data, name: "USB4 / Thunderbolt 3-4 (40 Gb/s)"}
   - {id: video.hdmi, kind: video, name: "HDMI digital video + audio"}

@@ -330,28 +330,66 @@ async function showInventory() {
     el("p", { class: "meta" }, `${total} items of ${rows.length} types.`),
     fill(bar, filterButton, searchBox, panel),
     list,
+    await yourDevices(),
     addNewForm(),
   ];
+}
+
+// yourDevices lists the devices you own with make, model and owner, and adds
+// one from the catalog: a named model, or a generic type when you don't know.
+async function yourDevices() {
+  const d = await api("/api/devices");
+  const pick = el("select", {}, el("option", { value: "" }, "pick a model"),
+    el("optgroup", { label: "models" }, d.models.filter((m) => !m.generic).map((m) => el("option", { value: m.id }, m.name))),
+    el("optgroup", { label: "generic: when you don't know the model" }, d.models.filter((m) => m.generic).map((m) => el("option", { value: m.id }, m.name))));
+  const nickname = el("input", { type: "text", class: "inline", placeholder: "what you call it (optional)" });
+  const owner = el("input", { type: "text", class: "inline", placeholder: "owner (optional)" });
+  const msg = el("div", {});
+  const add = async () => {
+    try {
+      const res = await api("/api/device/add", { model: pick.value, nickname: nickname.value, owner: owner.value });
+      await refresh();
+      location.hash = "#device/" + encodeURIComponent(res.name);
+    } catch (err) {
+      fill(msg, el("p", { class: "warn" }, err.message));
+    }
+  };
+  const sorted = d.devices.toSorted((a, b) => a.name.localeCompare(b.name));
+  return el("section", { class: "your-devices" },
+    el("h3", {}, "Your devices"),
+    el("table", { class: "devices" },
+      el("tr", {}, ["name", "make", "model", "owner"].map((h) => el("th", {}, h))),
+      sorted.map((x) => el("tr", {},
+        el("td", {}, el("a", { href: "#device/" + encodeURIComponent(x.name) }, x.name)),
+        el("td", {}, x.model.make || el("span", { class: "meta" }, x.model.generic ? "generic" : "—")),
+        el("td", { class: "meta" }, x.model.name || "no model yet"),
+        el("td", {}, x.owner || el("span", { class: "meta" }, "—"))))),
+    el("details", { class: "box" }, el("summary", {}, "+ Add a device you own"),
+      el("div", { class: "row" }, pick, nickname, owner, el("button", { onclick: () => pick.value && add() }, "Add device")),
+      el("p", { class: "meta" }, "Not listed? Add it as something new below, with its ports or as a typical one of its kind."),
+      msg));
 }
 
 // addNewForm adds a cable, adapter or device the catalog doesn't have, with
 // its ends or ports. It becomes your own catalog entry, so routes and
 // systems can use it like any other. Connectors and signals load on open.
-function addNewForm() {
+function addNewForm(start = "cable") {
   const box = el("details", { class: "box add-new" },
-    el("summary", {}, "+ Add something new: a cable, adapter or device the catalog doesn't have"));
+    el("summary", {}, start === "device"
+      ? "+ Add a new device: a model the catalog doesn't have, like a Logitech mouse"
+      : "+ Add something new: a cable, adapter or device the catalog doesn't have"));
   box.addEventListener("toggle", async () => {
     if (!box.open || box.dataset.ready) return;
     box.dataset.ready = "1";
     const kit = await api("/api/parts-kit");
-    box.append(...[addNewBody(kit)].flat());
+    box.append(...[addNewBody(kit, start)].flat());
   });
   return box;
 }
 
 const GENDERS = [["m", "plug"], ["f", "socket"]];
 
-function addNewBody(kit) {
+function addNewBody(kit, start) {
   const option = ([value, label], selected) => el("option", { value, selected: value === selected }, label);
   const connectorSelect = () => el("select", { class: "connector" }, el("option", { value: "" }, "connector"),
     kit.connectors.map((c) => el("option", { value: c.id }, c.name)));
@@ -406,7 +444,7 @@ function addNewBody(kit) {
   };
   ports.append(portRow());
 
-  const kind = el("select", {}, [["cable", "cable"], ["adapter", "adapter"], ["device", "device"]].map((o) => option(o, "cable")));
+  const kind = el("select", {}, [["cable", "cable"], ["adapter", "adapter"], ["device", "device"]].map((o) => option(o, start)));
   const name = text("e.g. Grey sync cable");
   const nickname = text("what you call it (optional)");
   const partFields = el("div", {},
@@ -420,18 +458,33 @@ function addNewBody(kit) {
     el("div", { class: "row" },
       el("label", { class: "field" }, "how many", qty),
       el("label", { class: "field" }, "where it's kept", where)));
-  const deviceFields = el("div", { hidden: true },
-    el("div", { class: "field" }, el("span", { class: "meta" }, "ports"), ports,
-      el("div", { class: "row" }, el("button", { class: "quiet", onclick: () => ports.append(portRow()) }, "+ another port"))));
-  kind.addEventListener("change", () => {
+  // A device's ports: list them, or say it's a typical one of a kind and
+  // take that type's ports as an assumption.
+  const make = text("e.g. Logitech"), owner = text("whose it is (optional)"), wireless = text("e.g. Bluetooth (optional)");
+  const generic = el("select", {}, el("option", { value: "" }, "I'll list its ports"),
+    el("optgroup", { label: "I don't know: assume a typical…" }, kit.generics.map((g) => el("option", { value: g.id }, g.name))));
+  const portEditor = el("div", { class: "field" }, el("span", { class: "meta" }, "ports"), ports,
+    el("div", { class: "row" }, el("button", { class: "quiet", onclick: () => ports.append(portRow()) }, "+ another port")));
+  generic.addEventListener("change", () => { portEditor.hidden = !!generic.value; });
+  const deviceFields = el("div", {},
+    el("div", { class: "row" },
+      el("label", { class: "field grow" }, "make", make),
+      el("label", { class: "field grow" }, "owner", owner),
+      el("label", { class: "field grow" }, "connects wirelessly by", wireless)),
+    el("label", { class: "field" }, "ports", generic),
+    portEditor);
+  const showKind = () => {
     partFields.hidden = kind.value === "device";
     deviceFields.hidden = kind.value !== "device";
-  });
+  };
+  kind.addEventListener("change", showKind);
+  showKind();
 
   const msg = el("div", {});
   const add = async () => {
     const body = kind.value === "device"
-      ? { kind: "device", name: name.value, nickname: nickname.value, ports: [...ports.children].map((r) => r.value()).filter(Boolean) }
+      ? { kind: "device", name: name.value, nickname: nickname.value, make: make.value, owner: owner.value, wireless: wireless.value,
+          generic: generic.value, ports: generic.value ? [] : [...ports.children].map((r) => r.value()).filter(Boolean) }
       : { kind: kind.value, name: name.value, nickname: nickname.value, ends: [...ends.children].map((r) => r.value()).filter(Boolean),
           signals: partSignals.value(), variant: variant.value.trim(), volts: Number(volts.value) || 0, amps: Number(amps.value) || 0,
           qty: Number(qty.value) || 1, location: where.value };
@@ -477,9 +530,14 @@ async function showConnector(id) {
 async function showDevice(name) {
   const d = await api("/api/device?name=" + encodeURIComponent(name));
   const sig = (ids) => ids.map((s) => d.signal_names[s] || s).join(", ");
+  const owner = d.nickname ? el("input", { type: "text", class: "inline", value: d.owner || "", placeholder: "whose it is",
+    onchange: async () => { await api("/api/device/owner", { name: d.nickname, owner: owner.value }); } }) : null;
   return [
     el("h2", {}, d.nickname || d.name),
-    el("p", { class: "meta" }, d.name, " · ", d.model),
+    el("p", { class: "meta" }, [d.make, d.name, d.category, d.generic ? "generic type" : null].filter(Boolean).join(" · ")),
+    d.docs ? el("p", { class: "meta" }, el("a", { href: d.docs, target: "_blank", rel: "noopener" }, "Maker's page and documentation ↗")) : null,
+    d.wireless ? el("p", {}, "Connects wirelessly via ", d.wireless, ": no cable needed for that.") : null,
+    owner ? el("label", { class: "field owner" }, "owner", owner) : null,
     d.assumption ? el("p", { class: "note" }, "Ports not confirmed: assumes ", d.assumption, ".") : null,
     d.hint ? el("p", { class: "note" }, d.hint) : null,
     d.ports.length ? null : el("p", {}, "No cable ports."),
@@ -593,6 +651,27 @@ async function showSystem(name) {
   };
   const endpoint = (dev, port) => (dev ? dev + (port ? " · " + port : "") : "?");
   const adder = linkEditor(b);
+
+  // The devices in it, each with its ports and, while it's off, a way out.
+  const members = [...new Set(d.links.flatMap((l) => [l.from_device, l.to_device]).filter(Boolean))];
+  const dir = { in: "in", out: "out", both: "in/out" };
+  const devices = members.map((name) => {
+    const dev = b.devices.find((x) => x.name === name);
+    return el("details", { class: "member" },
+      el("summary", {}, el("a", { href: "#device/" + encodeURIComponent(name) }, name), " ",
+        el("span", { class: "meta" }, dev ? `${dev.ports.length} port${dev.ports.length === 1 ? "" : "s"}` : ""), " ",
+        d.up ? null : el("button", { class: "quiet", title: `Take ${name} out, with the cables that reach it`,
+          onclick: (e) => { e.preventDefault(); post("/api/system/remove-device", { system: d.name, device: name }); } }, "remove")),
+      dev && dev.ports.length
+        ? el("ul", {}, dev.ports.map((p) => el("li", {}, p.label, " ", el("span", { class: "meta" }, `${p.end} · ${dir[p.dir] || p.dir}`))))
+        : el("p", { class: "meta" }, "No ports listed."));
+  });
+  const others = b.devices.filter((x) => x.model && !members.includes(x.name));
+  const newDevice = el("select", {}, el("option", { value: "" }, "device"), others.map((x) => el("option", { value: x.name }, x.name)));
+  const joinTo = el("select", {}, members.map((m) => el("option", { value: m }, m)));
+  const addDevice = d.up || !members.length ? null : el("div", { class: "row" },
+    el("span", { class: "meta" }, "Add"), newDevice, el("span", { class: "meta" }, "connected to"), joinTo,
+    el("button", { onclick: () => newDevice.value && post("/api/system/add-device", { system: d.name, device: newDevice.value, to: joinTo.value }) }, "Add device"));
   const del = el("button", { class: "quiet danger", onclick: () => {
     // Two clicks, no dialog: the first arms it for a few seconds.
     if (del.dataset.armed) return post("/api/system/delete", { name: d.name }).then(() => (location.hash = "#systems"));
@@ -605,14 +684,18 @@ async function showSystem(name) {
     el("h2", {}, d.name, " ", statusTag(d.up ? "up" : "down")),
     el("div", { class: "row" }, el("button", { onclick: () => toggle(false) }, d.up ? "Switch off" : "Switch on")),
     msg,
+    el("h3", {}, "Devices"),
+    members.length ? devices : el("p", { class: "meta" }, "None yet: add a cable below."),
+    addDevice,
+    el("h3", {}, "Cables"),
     d.links.length
       ? el("table", {},
           el("tr", {}, ["", "from → to", "cable", "item", ""].map((h) => el("th", {}, h))),
           d.links.map((l, n) => el("tr", {},
             el("td", { class: "meta" }, n + 1),
             el("td", {}, endpoint(l.from_device, l.from_port), " → ", endpoint(l.to_device, l.to_port)),
-            el("td", {}, el("a", { href: "#part/" + encodeURIComponent(l.part) }, d.part_names[l.part])),
-            el("td", { class: "meta" }, l.assigned ? `your #${d.short_ids[l.assigned]}, in use` : l.preferred ? `your #${d.short_ids[l.preferred]}` : "open: any available"),
+            el("td", {}, l.part ? el("a", { href: "#part/" + encodeURIComponent(l.part) }, d.part_names[l.part]) : el("span", { class: "meta" }, "plugs straight in")),
+            el("td", { class: "meta" }, !l.part ? "its own lead" : l.assigned ? `your #${d.short_ids[l.assigned]}, in use` : l.preferred ? `your #${d.short_ids[l.preferred]}` : "open: any available"),
             el("td", {}, d.up ? null : el("button", { class: "quiet", title: "Remove this cable", onclick: () => post("/api/system/unlink", { id: l.id }) }, "×")))))
       : el("p", { class: "meta" }, "No cables yet."),
     d.conflicts.map((c) => el("p", { class: "cant" }, `Can't be on with "${c.with}": `, c.port ? `both plug into ${c.port}` : `both need ${d.part_names[c.part] || c.part} (you own ${c.have})`)),
@@ -685,6 +768,8 @@ async function showSystems() {
     details,
     msg,
     el("div", { class: "row" }, el("button", { onclick: create }, "Create system")),
+    el("p", { class: "meta" }, "A device you own isn't in the lists? Add it here, then pick it above."),
+    addNewForm("device"),
   ];
 }
 
@@ -799,6 +884,7 @@ function connectResult(d) {
           s.buy ? el("span", { class: "tag need", title: "You don't own one" }, "need")
             : [idTag(s.item), " ", statusTag(s.busy_in ? "in use" : "free"), s.busy_in ? el("span", { class: "meta" }, ` by ${s.busy_in}`) : null],
           d.outlines[s.part.key] ? el("details", { open: true }, el("summary", { class: "meta" }, "outline"), el("pre", {}, d.outlines[s.part.key])) : null)),
+        r.steps.length ? null : el("li", { class: "step" }, el("span", { class: "meta" }, "plugs straight in: no cable needed")),
         el("li", { class: "end" }, el("strong", {}, d.to), el("span", { class: "meta" }, " · " + r.to_port))));
   });
 

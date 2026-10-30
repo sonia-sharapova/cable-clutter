@@ -241,7 +241,8 @@ func deviceJSON(m *catalog.DeviceModel, nickname, hint string, reports []advise.
 		}
 		ports = append(ports, pv)
 	}
-	out := map[string]any{"model": m.ID, "name": m.Name, "confirmed": m.Confirmed, "ports": ports}
+	out := map[string]any{"model": m.ID, "name": m.Name, "confirmed": m.Confirmed, "ports": ports,
+		"make": m.Make, "category": m.Category, "generic": m.Generic, "wireless": m.Wireless, "docs": m.Docs}
 	if !m.Confirmed {
 		out["assumption"] = m.Assumption
 	}
@@ -264,7 +265,7 @@ func shortConnector(c *catalog.Catalog, id string) string {
 }
 
 func deviceAddCmd() *cobra.Command {
-	var name, notes string
+	var name, notes, owner string
 	cmd := &cobra.Command{
 		Use:   "add <model>",
 		Short: "Record a device you own (gives a model to a placeholder of the same name)",
@@ -293,6 +294,11 @@ func deviceAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if owner != "" {
+				if err := db.SetOwner(d.ID, owner); err != nil {
+					return err
+				}
+			}
 			if jsonOut {
 				return emit(cmd, map[string]any{"id": d.ID, "short_id": d.ShortID(), "nickname": d.Nickname, "model": m.ID, "created": created})
 			}
@@ -309,6 +315,7 @@ func deviceAddCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&name, "name", "", "what you call it (default: the model name)")
 	cmd.Flags().StringVar(&notes, "notes", "", "free-form notes")
+	cmd.Flags().StringVar(&owner, "owner", "", "whose it is")
 	return cmd
 }
 
@@ -340,11 +347,12 @@ func deviceLsCmd() *cobra.Command {
 					Model     string `json:"model,omitempty"`
 					Confirmed bool   `json:"confirmed"`
 					Notes     string `json:"notes,omitempty"`
+					Owner     string `json:"owner,omitempty"`
 				}
 				views := []deviceView{}
 				for _, d := range devices {
 					m, ok := c.Devices[d.Model]
-					views = append(views, deviceView{d.ID, d.ShortID(), d.Nickname, d.Model, ok && m.Confirmed, d.Notes})
+					views = append(views, deviceView{d.ID, d.ShortID(), d.Nickname, d.Model, ok && m.Confirmed, d.Notes, d.Owner})
 				}
 				return emit(cmd, views)
 			}
@@ -353,7 +361,7 @@ func deviceLsCmd() *cobra.Command {
 				return nil
 			}
 			tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "ID\tNAME\tMODEL\tPORTS\tNOTES")
+			fmt.Fprintln(tw, "ID\tNAME\tMODEL\tOWNER\tPORTS\tNOTES")
 			for _, d := range devices {
 				model, ports, note := "(none yet)", "", d.Notes
 				if m, ok := c.Devices[d.Model]; ok {
@@ -367,7 +375,7 @@ func deviceLsCmd() *cobra.Command {
 						note = strings.TrimSpace("ports unconfirmed " + note)
 					}
 				}
-				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", d.ShortID(), d.Nickname, model, ports, note)
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", d.ShortID(), d.Nickname, model, d.Owner, ports, note)
 			}
 			return tw.Flush()
 		},

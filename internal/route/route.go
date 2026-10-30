@@ -95,13 +95,13 @@ func Connect(c *catalog.Catalog, a, b *catalog.DeviceModel, inv plan.Inventories
 	for pq.Len() > 0 {
 		n := heap.Pop(pq).(*node)
 		kind := c.Signals[n.signal].Kind
-		if len(n.steps) > 0 {
-			if _, done := best[kind]; !done {
-				for _, t := range b.Ports {
-					if t.Receives(n.signal) && c.Meets(n.open, t.End) {
-						best[kind] = &Route{Signal: n.signal, From: n.from, To: t, Steps: n.steps, Cost: n.cost}
-						break
-					}
+		// With no steps yet, a device whose own lead ends in a plug (a
+		// keyboard, a USB stick) goes straight into the other's socket.
+		if _, done := best[kind]; !done {
+			for _, t := range b.Ports {
+				if t.Receives(n.signal) && c.Meets(n.open, t.End) {
+					best[kind] = &Route{Signal: n.signal, From: n.from, To: t, Steps: n.steps, Cost: n.cost}
+					break
 				}
 			}
 		}

@@ -17,6 +17,7 @@ type Device struct {
 	Model    string
 	Nickname string
 	Notes    string
+	Owner    string // whose it is, if you said
 }
 
 func (d *Device) ShortID() string { return strings.ReplaceAll(d.ID, "-", "")[26:] }
@@ -63,7 +64,7 @@ func (db *DB) AddDevice(model, nickname, notes string) (d *Device, created bool,
 
 // Devices lists live devices, oldest first.
 func (db *DB) Devices() ([]*Device, error) {
-	rows, err := db.Query(`SELECT id, model, nickname, notes FROM devices WHERE deleted = 0 ORDER BY id`)
+	rows, err := db.Query(`SELECT id, model, nickname, notes, owner FROM devices WHERE deleted = 0 ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +72,33 @@ func (db *DB) Devices() ([]*Device, error) {
 	var out []*Device
 	for rows.Next() {
 		d := &Device{}
-		if err := rows.Scan(&d.ID, &d.Model, &d.Nickname, &d.Notes); err != nil {
+		if err := rows.Scan(&d.ID, &d.Model, &d.Nickname, &d.Notes, &d.Owner); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+// SetOwner records whose a device is ("" for nobody in particular).
+func (db *DB) SetOwner(id, owner string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	at := now()
+	res, err := tx.Exec(`UPDATE devices SET owner = ?, updated_at = ?, rev = rev + 1 WHERE id = ? AND deleted = 0`, strings.TrimSpace(owner), at, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("no device %s", id)
+	}
+	if err := logChange(tx, "devices", id, "update", at); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // FindDevices matches devices by short id or nickname (case-insensitive).

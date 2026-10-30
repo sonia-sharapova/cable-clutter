@@ -36,6 +36,7 @@ connectors:
   - {id: trs-3.5, family: audio, name: "3.5 mm stereo jack (TRS)", aliases: [aux, 3.5mm, 3.5 mm, headphone jack, mini jack, eighth inch, 1/8 inch]}
   - {id: trrs-3.5, family: audio, name: "3.5 mm headset / AV jack (TRRS)", aliases: [trrs, headset jack, 4 pole], mates: [trs-3.5]}
   - {id: trs-6.35, family: audio, name: "6.35 mm jack (1/4 inch)", aliases: [quarter inch, 1/4 inch, 6.35mm, jack], uncommon: true}
+  - {id: midi-din, family: audio, name: "MIDI (5-pin DIN)", aliases: [midi, 5 pin din, din midi], uncommon: true}
   - {id: toslink, family: audio, name: "TOSLINK optical", aliases: [optical, spdif, s/pdif], uncommon: true}
 
   # Network and storage

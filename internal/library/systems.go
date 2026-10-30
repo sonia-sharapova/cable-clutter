@@ -32,6 +32,10 @@ type Link struct {
 	ToPort     string
 }
 
+// Direct reports whether the link is a device plugging straight into
+// another (a keyboard's own lead into a computer): no cable, no part type.
+func (l *Link) Direct() bool { return l.PartKey == "" }
+
 func newID() (string, error) {
 	u, err := uuid.NewV7()
 	return u.String(), err

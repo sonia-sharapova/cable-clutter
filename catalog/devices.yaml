@@ -6,6 +6,11 @@
 # on an assumption about the exact model; `assumption` says which.
 # `out_only` lists signals that only leave a two-way port (a laptop's USB-C
 # port sends video but doesn't take it in).
+# A plug on the device itself ("usb-a:m" on a wired keyboard) is its own lead:
+# it goes straight into a matching socket, no cable needed.
+# `make` and `docs` (the maker's page) are for named models; `generic: true`
+# marks a typical one of its `category`, for when you don't know the model.
+# `wireless` says how it connects without a cable.
 devices:
   - id: mac-mini-m2-2023
     name: "Mac mini (M2, 2023)"
@@ -42,6 +47,9 @@ devices:
   - id: raspberry-pi-3b
     name: "Raspberry Pi 3 Model B / B+"
     aliases: [raspberry pi, pi, rpi, pi 3]
+    make: Raspberry Pi
+    category: computer
+    docs: "https://www.raspberrypi.com/documentation/computers/raspberry-pi.html"
     confirmed: false
     assumption: "micro-USB power means Pi 3 or earlier; ports shown are the Pi 3 B/B+"
     ports:
@@ -159,8 +167,202 @@ devices:
   - id: te-ob-4
     name: "Teenage Engineering OB-4 speaker"
     aliases: [ob-4, ob4, teenage engineering speaker]
+    make: Teenage Engineering
+    category: speaker
+    docs: "https://teenage.engineering/products/ob-4"
     confirmed: false
     assumption: "the OB-4; other Teenage Engineering speakers differ"
     ports:
       - {label: Line in, end: "trs-3.5:f", dir: in, signals: [audio.analog.stereo]}
       - {label: USB-C, end: "usb-c:f", dir: in, signals: [power.usb], note: "Charging only"}
+
+  # Generic types: a typical one of each, for when you don't know the model.
+  # Ports are what most of them have; each says what it assumes.
+  - id: generic-usb-keyboard
+    name: "Wired USB keyboard (generic)"
+    aliases: [keyboard, usb keyboard, wired keyboard]
+    category: keyboard
+    generic: true
+    confirmed: false
+    assumption: "a keyboard with its own lead ending in a USB-A plug"
+    ports:
+      - {label: USB lead, end: "usb-a:m", dir: both, signals: [usb.2.0, power.usb], note: "Its own cable: plugs straight into a USB-A socket"}
+
+  - id: generic-usb-mouse
+    name: "Wired USB mouse (generic)"
+    aliases: [mouse, usb mouse, wired mouse]
+    category: mouse
+    generic: true
+    confirmed: false
+    assumption: "a mouse with its own lead ending in a USB-A plug"
+    ports:
+      - {label: USB lead, end: "usb-a:m", dir: both, signals: [usb.2.0, power.usb], note: "Its own cable: plugs straight into a USB-A socket"}
+
+  - id: generic-wireless-mouse
+    name: "Wireless mouse with USB receiver (generic)"
+    aliases: [wireless mouse, dongle mouse]
+    category: mouse
+    generic: true
+    wireless: "its USB receiver"
+    confirmed: false
+    assumption: "a battery mouse that pairs with a small USB-A receiver"
+    ports:
+      - {label: USB receiver, end: "usb-a:m", dir: both, signals: [usb.2.0, power.usb], note: "The little dongle it comes with"}
+
+  - id: generic-bluetooth-mouse
+    name: "Bluetooth mouse (generic)"
+    aliases: [bluetooth mouse, bt mouse]
+    category: mouse
+    generic: true
+    wireless: Bluetooth
+    confirmed: false
+    assumption: "a rechargeable Bluetooth mouse that charges over USB-C"
+    ports:
+      - {label: Charge, end: "usb-c:f", dir: in, signals: [power.usb]}
+
+  - id: generic-bluetooth-keyboard
+    name: "Bluetooth keyboard (generic)"
+    aliases: [bluetooth keyboard, bt keyboard, wireless keyboard]
+    category: keyboard
+    generic: true
+    wireless: Bluetooth
+    confirmed: false
+    assumption: "a rechargeable Bluetooth keyboard that charges over USB-C"
+    ports:
+      - {label: Charge, end: "usb-c:f", dir: in, signals: [power.usb]}
+
+  - id: generic-bluetooth-speaker
+    name: "Bluetooth speaker with aux in (generic)"
+    aliases: [bluetooth speaker, bt speaker, portable speaker]
+    category: speaker
+    generic: true
+    wireless: Bluetooth
+    confirmed: false
+    assumption: "a portable speaker with a 3.5 mm aux input that charges over USB-C"
+    ports:
+      - {label: Aux in, end: "trs-3.5:f", dir: in, signals: [audio.analog.stereo]}
+      - {label: Charge, end: "usb-c:f", dir: in, signals: [power.usb]}
+
+  - id: generic-aux-speakers
+    name: "Computer speakers with aux lead (generic)"
+    aliases: [computer speakers, desk speakers, aux speakers, wired speakers]
+    category: speaker
+    generic: true
+    confirmed: false
+    assumption: "desk speakers with their own 3.5 mm lead, powered over USB"
+    ports:
+      - {label: Aux lead, end: "trs-3.5:m", dir: in, signals: [audio.analog.stereo], note: "Its own cable: plugs straight into a headphone jack"}
+      - {label: USB power lead, end: "usb-a:m", dir: in, signals: [power.usb]}
+
+  - id: generic-usb-microphone
+    name: "USB microphone (generic)"
+    aliases: [usb mic, usb microphone, microphone, mic]
+    category: microphone
+    generic: true
+    confirmed: false
+    assumption: "a USB-C microphone with a headphone jack for monitoring"
+    ports:
+      - {label: USB-C, end: "usb-c:f", dir: both, signals: [usb.2.0, power.usb]}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+
+  - id: generic-headphones
+    name: "Wired headphones (generic)"
+    aliases: [headphones, earphones, wired headphones]
+    category: headphones
+    generic: true
+    confirmed: false
+    assumption: "headphones with their own 3.5 mm lead"
+    ports:
+      - {label: Lead, end: "trs-3.5:m", dir: in, signals: [audio.analog.stereo], note: "Its own cable: plugs straight into a headphone jack"}
+
+  # Named models.
+  - id: logitech-mx-master-3s
+    name: "Logitech MX Master 3S"
+    aliases: [mx master, mx master 3s, master 3s]
+    make: Logitech
+    category: mouse
+    wireless: "Bluetooth or its Logi Bolt receiver"
+    docs: "https://www.logitech.com/en-us/products/mice/mx-master-3s.910-006557.html"
+    confirmed: true
+    ports:
+      - {label: Charge, end: "usb-c:f", dir: in, signals: [power.usb], note: "Usable while charging"}
+      - {label: Logi Bolt receiver, end: "usb-a:m", dir: both, signals: [usb.2.0, power.usb], note: "The USB receiver in the box, if you don't use Bluetooth"}
+
+  - id: logitech-mx-keys-s
+    name: "Logitech MX Keys S"
+    aliases: [mx keys, mx keys s]
+    make: Logitech
+    category: keyboard
+    wireless: "Bluetooth or a Logi Bolt receiver"
+    docs: "https://www.logitech.com/en-us/products/keyboards/mx-keys-s.920-011406.html"
+    confirmed: true
+    ports:
+      - {label: Charge, end: "usb-c:f", dir: in, signals: [power.usb]}
+
+  - id: apple-magic-mouse-usb-c
+    name: "Apple Magic Mouse (USB-C)"
+    aliases: [magic mouse]
+    make: Apple
+    category: mouse
+    wireless: Bluetooth
+    docs: "https://www.apple.com/shop/product/MXK53AM/A/magic-mouse-usb-c-white-multi-touch-surface"
+    confirmed: true
+    ports:
+      - {label: USB-C, end: "usb-c:f", dir: in, signals: [power.usb], note: "Charging and pairing"}
+
+  - id: apple-magic-keyboard-usb-c
+    name: "Apple Magic Keyboard (USB-C)"
+    aliases: [magic keyboard]
+    make: Apple
+    category: keyboard
+    wireless: Bluetooth
+    confirmed: true
+    ports:
+      - {label: USB-C, end: "usb-c:f", dir: both, signals: [usb.2.0, power.usb], note: "Charges, pairs, and works as a wired keyboard"}
+
+  - id: blue-yeti
+    name: "Blue Yeti USB microphone"
+    aliases: [yeti, blue yeti, logitech yeti]
+    make: Logitech (Blue)
+    category: microphone
+    docs: "https://www.logitechg.com/en-us/products/streaming-gear/yeti-premium-usb-microphone.988-000100.html"
+    confirmed: true
+    ports:
+      - {label: USB, end: "mini-usb:f", dir: both, signals: [usb.2.0, power.usb]}
+      - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo], note: "Zero-latency monitoring"}
+
+  - id: jbl-flip-6
+    name: "JBL Flip 6"
+    aliases: [flip 6, jbl flip, jbl speaker]
+    make: JBL
+    category: speaker
+    wireless: Bluetooth
+    confirmed: true
+    ports:
+      - {label: Charge, end: "usb-c:f", dir: in, signals: [power.usb], note: "No aux input: Bluetooth only"}
+
+  - id: pioneer-ddj-400
+    name: "Pioneer DJ DDJ-400"
+    aliases: [ddj-400, ddj400, pioneer dj, pioneer controller, dj controller]
+    make: Pioneer DJ
+    category: DJ controller
+    docs: "https://www.pioneerdj.com/en/product/controller/ddj-400/black/overview/"
+    confirmed: false
+    assumption: "ports as on the DDJ-400; check the back panel of yours"
+    ports:
+      - {label: USB, end: "usb-b:f", dir: both, signals: [usb.2.0, power.usb], note: "Powered by the computer's USB"}
+      - {label: Master out, end: "rca*2:f", dir: out, signals: [audio.analog.stereo]}
+      - {label: Phones (1/4 in), end: "trs-6.35:f", dir: out, signals: [audio.analog.stereo]}
+      - {label: Phones (3.5 mm), end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
+      - {label: Mic in, end: "trs-6.35:f", dir: in, signals: [audio.analog.mic]}
+
+  - id: arturia-minilab-3
+    name: "Arturia MiniLab 3"
+    aliases: [minilab, minilab 3, minilab mk3, arturia]
+    make: Arturia
+    category: MIDI keyboard
+    docs: "https://www.arturia.com/products/hybrid-synths/minilab-3/overview"
+    confirmed: true
+    ports:
+      - {label: USB-C, end: "usb-c:f", dir: both, signals: [usb.2.0, power.usb], note: "Bus-powered, class-compliant; also has a 1/4 in pedal input"}
+      - {label: MIDI out, end: "midi-din:f", dir: out, signals: [midi], note: "Also works as MIDI thru"}

@@ -32,6 +32,9 @@ func (st *state) ownedDevice(ref string) (smart.Device, error) {
 
 // routeParts names a route's parts: "HDMI cable → HDMI to composite …".
 func routeParts(r *route.Route) string {
+	if len(r.Steps) == 0 {
+		return "plugs straight in"
+	}
 	names := make([]string, len(r.Steps))
 	for i, s := range r.Steps {
 		names[i] = s.Part.Name
@@ -202,6 +205,12 @@ func (st *state) savePlan(name string, hops []smart.Hop, pin bool) (*library.Sys
 	if err != nil {
 		return nil, err
 	}
+	return s, st.addHops(s, hops, pin)
+}
+
+// addHops saves each hop's routes as links of system s: one link per cable
+// or adapter, the first naming where it starts, the last where it ends.
+func (st *state) addHops(s *library.System, hops []smart.Hop, pin bool) error {
 	for _, h := range hops {
 		var done []*route.Route
 		for _, kind := range smart.Kinds {
@@ -210,6 +219,14 @@ func (st *state) savePlan(name string, hops []smart.Hop, pin bool) (*library.Sys
 				continue
 			}
 			done = append(done, r)
+			if len(r.Steps) == 0 {
+				// The device plugs straight in: one link, no cable.
+				l := library.Link{SystemID: s.ID, FromDevice: h.From.Nickname, FromPort: r.From.Label, ToDevice: h.To.Nickname, ToPort: r.To.Label}
+				if _, err := st.db.AddLink(l); err != nil {
+					return err
+				}
+				continue
+			}
 			for i, step := range r.Steps {
 				l := library.Link{SystemID: s.ID, PartKey: step.Part.Key}
 				if pin && step.Item != nil {
@@ -222,12 +239,12 @@ func (st *state) savePlan(name string, hops []smart.Hop, pin bool) (*library.Sys
 					l.ToDevice, l.ToPort = h.To.Nickname, r.To.Label
 				}
 				if _, err := st.db.AddLink(l); err != nil {
-					return nil, err
+					return err
 				}
 			}
 		}
 	}
-	return s, nil
+	return nil
 }
 
 func bestBuyCmd() *cobra.Command {

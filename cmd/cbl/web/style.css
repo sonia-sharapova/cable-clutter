@@ -194,6 +194,12 @@ details.signals > summary { border: 1px solid rgb(0 0 0 / 0.18); padding: 0.25re
 details.connector { margin: 0; padding: 0.25rem 0; border-top: 1px dashed rgb(0 0 0 / 0.12); }
 details.connector > summary { font-size: 0.95rem; }
 details.connector ul { margin: 0.2rem 0 var(--pad) 1.2rem !important; }
+table.devices { table-layout: fixed; }
+table.devices td { border-top: 1px dashed rgb(0 0 0 / 0.15); padding: 0.35rem var(--pad) 0.35rem 0; overflow-wrap: anywhere; }
+.your-devices { margin-top: var(--pad-xlarge); }
+label.owner { max-width: 20rem; }
+details.member { padding: 0.2rem 0; border-top: 1px dashed rgb(0 0 0 / 0.12); }
+details.member ul { margin: 0.2rem 0 var(--pad) 1.2rem !important; font-size: 0.9rem; }
 .save-system ul { list-style: none; margin: var(--pad) 0 !important; }
 .wish-results { list-style: none; margin-bottom: var(--pad-large) !important; }
 /* Wishlist: fixed columns, so rows line up however many there are; the

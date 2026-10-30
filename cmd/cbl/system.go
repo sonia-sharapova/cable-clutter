@@ -83,6 +83,9 @@ func (st *state) system(name string) (*library.System, error) {
 }
 
 func (st *state) partName(key string) string {
+	if key == "" {
+		return "plugs straight in"
+	}
 	if p, ok := st.c.Part(key); ok {
 		return p.Name
 	}
@@ -673,6 +676,8 @@ func systemShowCmd() *cobra.Command {
 				fmt.Fprintf(out, "%2d. %s → %s\n", i+1, endpointText(l.FromDevice, l.FromPort), endpointText(l.ToDevice, l.ToPort))
 				line := "    " + st.partName(l.PartKey)
 				switch p, ok := preview[l.ID]; {
+				case l.Direct():
+					// Nothing to own: the device's own lead.
 				case s.Active && l.Assigned != "":
 					line += fmt.Sprintf("  #%s in use", st.item(l.Assigned).ShortID())
 				case ok:

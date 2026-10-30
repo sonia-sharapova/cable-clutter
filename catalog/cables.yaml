@@ -54,6 +54,7 @@ cables:
   - {ends: [trs-3.5:m, "trs-3.5*2:f"], signals: [audio.analog.stereo], name: "3.5 mm headphone splitter", aliases: [headphone splitter, y splitter, two headed aux]}
   - {ends: [trs-3.5:m, trs-6.35:m], signals: [audio.analog.stereo], name: "3.5 mm to 6.35 mm"}
   - {ends: [toslink:m, toslink:m], signals: [audio.optical], name: "Optical audio cable"}
+  - {ends: [midi-din:m, midi-din:m], signals: [midi], name: "MIDI cable (5-pin DIN)", aliases: [midi cable]}
 
   # Network and storage
   - {ends: [rj45:m, rj45:m], signals: [net.ethernet], name: "Ethernet cable", aliases: [patch cable]}

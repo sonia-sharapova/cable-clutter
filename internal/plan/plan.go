@@ -45,6 +45,9 @@ func Allocate(c *catalog.Catalog, links []*library.Link, inv Inventories) ([]Pic
 	var picks []Pick
 	var short []Shortage
 	for _, l := range links {
+		if l.Direct() {
+			continue // nothing to allocate: the device's own lead
+		}
 		in := inv.Of(c, l.PartKey)
 		var best *library.Item
 		bestRank := 99
@@ -156,7 +159,9 @@ func Conflicts(c *catalog.Catalog, ports Ports, systems []*library.System, links
 	for _, s := range systems {
 		demand[s.ID] = map[string]int{}
 		for _, l := range links[s.ID] {
-			demand[s.ID][l.PartKey]++
+			if !l.Direct() {
+				demand[s.ID][l.PartKey]++
+			}
 		}
 		use[s.ID] = portUse(links[s.ID])
 	}
@@ -242,7 +247,9 @@ type Missing struct {
 func Short(c *catalog.Catalog, links []*library.Link, inv Inventories) []Missing {
 	need := map[string]int{}
 	for _, l := range links {
-		need[l.PartKey]++
+		if !l.Direct() {
+			need[l.PartKey]++
+		}
 	}
 	var out []Missing
 	for _, key := range sortedKeys(need) {

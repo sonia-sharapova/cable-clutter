@@ -23,11 +23,16 @@ type CustomPart struct {
 	Note    string   `json:"note,omitempty"`
 }
 
-// CustomDevice is a device model with its ports.
+// CustomDevice is a device model with its ports. Ports copied from a
+// generic type carry an assumption saying so.
 type CustomDevice struct {
-	ID    string       `json:"id"`
-	Name  string       `json:"name"`
-	Ports []CustomPort `json:"ports"`
+	ID         string       `json:"id"`
+	Name       string       `json:"name"`
+	Make       string       `json:"make,omitempty"`
+	Category   string       `json:"category,omitempty"`
+	Wireless   string       `json:"wireless,omitempty"`
+	Assumption string       `json:"assumption,omitempty"`
+	Ports      []CustomPort `json:"ports"`
 }
 
 // CustomPort is one kind of port on a custom device.
@@ -45,8 +50,10 @@ func (p CustomPart) raw() rawPart {
 }
 
 func (d CustomDevice) raw() rawDevice {
-	// You described it from the device in front of you: confirmed.
-	r := rawDevice{ID: d.ID, Name: d.Name, Confirmed: true}
+	// Ports you listed from the device in front of you are confirmed;
+	// ones taken from a generic type are an assumption.
+	r := rawDevice{ID: d.ID, Name: d.Name, Make: d.Make, Category: d.Category, Wireless: d.Wireless,
+		Confirmed: d.Assumption == "", Assumption: d.Assumption}
 	for _, p := range d.Ports {
 		r.Ports = append(r.Ports, rawPort{Label: p.Label, End: p.End, Qty: p.Qty, Dir: p.Dir, Signals: p.Signals, Volts: p.Volts})
 	}
@@ -86,8 +93,8 @@ func (c *Catalog) CheckDevice(d CustomDevice) error {
 	if _, dup := c.Devices[d.ID]; dup {
 		return fmt.Errorf("a device model %q already exists", d.ID)
 	}
-	if len(d.Ports) == 0 {
-		return fmt.Errorf("device %q: give it at least one port", d.Name)
+	if len(d.Ports) == 0 && d.Wireless == "" {
+		return fmt.Errorf("device %q: give it at least one port, or say how it connects wirelessly", d.Name)
 	}
 	probe := &Catalog{Signals: c.Signals, Connectors: c.Connectors, Devices: map[string]*DeviceModel{}}
 	if errs := probe.addDevices([]rawDevice{d.raw()}); len(errs) > 0 {

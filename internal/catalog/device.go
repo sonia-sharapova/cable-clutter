@@ -12,6 +12,11 @@ type DeviceModel struct {
 	Aliases    []string `json:"aliases,omitempty"`
 	Confirmed  bool     `json:"confirmed"`            // false: ports rest on an assumption about the model
 	Assumption string   `json:"assumption,omitempty"` // which assumption, when not confirmed
+	Make       string   `json:"make,omitempty"`       // brand; empty for a generic type
+	Category   string   `json:"category,omitempty"`   // mouse, keyboard, speaker, computer…
+	Generic    bool     `json:"generic,omitempty"`    // a typical one of its category, not a model
+	Wireless   string   `json:"wireless,omitempty"`   // how it connects without a cable, e.g. "Bluetooth"
+	Docs       string   `json:"docs,omitempty"`       // the maker's page or manual
 	Ports      []Port   `json:"ports"`
 }
 
@@ -53,6 +58,11 @@ type rawDevice struct {
 	Aliases    []string
 	Confirmed  bool
 	Assumption string
+	Make       string
+	Category   string
+	Generic    bool
+	Wireless   string
+	Docs       string
 	Ports      []rawPort
 }
 
@@ -70,7 +80,8 @@ func (c *Catalog) addDevices(raws []rawDevice) []error {
 		if !r.Confirmed && r.Assumption == "" {
 			errs = append(errs, fmt.Errorf("device %q: unconfirmed ports need an assumption", r.ID))
 		}
-		d := &DeviceModel{ID: r.ID, Name: r.Name, Aliases: r.Aliases, Confirmed: r.Confirmed, Assumption: r.Assumption}
+		d := &DeviceModel{ID: r.ID, Name: r.Name, Aliases: r.Aliases, Confirmed: r.Confirmed, Assumption: r.Assumption,
+			Make: r.Make, Category: r.Category, Generic: r.Generic, Wireless: r.Wireless, Docs: r.Docs}
 		for _, rp := range r.Ports {
 			p, err := c.newPort(rp)
 			if err != nil {

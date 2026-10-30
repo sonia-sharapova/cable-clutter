@@ -96,7 +96,7 @@ type routeJSON struct {
 func routesJSON(routes map[string]*route.Route) map[string]routeJSON {
 	out := map[string]routeJSON{}
 	for kind, r := range routes {
-		rj := routeJSON{Signal: r.Signal, From: r.From.Label, To: r.To.Label, Cost: r.Cost}
+		rj := routeJSON{Signal: r.Signal, From: r.From.Label, To: r.To.Label, Cost: r.Cost, Steps: []stepJSON{}}
 		for _, s := range r.Steps {
 			sj := stepJSON{Part: viewPart(s.Part), In: s.In.String(), Out: s.Out.String(), BusyIn: s.Busy, Buy: s.Item == nil}
 			if s.Item != nil {
@@ -138,6 +138,9 @@ func writeRoutes(w io.Writer, st *state, aName, bName string, routes map[string]
 		shownKind[r] = kind
 
 		fmt.Fprintf(w, "  %s · %s\n", aName, r.From.Label)
+		if len(r.Steps) == 0 {
+			fmt.Fprintln(w, "    → plugs straight in")
+		}
 		for _, s := range r.Steps {
 			line := "    → " + s.Part.Name
 			switch {
