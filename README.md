@@ -38,6 +38,10 @@ server, no network after the download.
    cbl catalog devices                       # the models it knows
    cbl connect Pi "Dell monitor"             # how to hook two things up
    ```
+   Everything you add is saved the moment you add it, in one database file on
+   your computer (`cbl doctor` shows where). It stays there when you stop the
+   server, close the terminal or restart, and is the same library whether you
+   use the page or the commands. It isn't synced to other computers.
 7. **Back up** now and then: `cbl export -o backup.json`.
 8. **Update** later with `git pull && go install ./cmd/cbl`. Your library is
    kept and upgraded in place.

@@ -1152,6 +1152,18 @@ async function refresh() {
   index = buildIndex(await api("/api/index"));
   search();
   footer(pageBytes());
+  orderTabs();
+}
+
+// orderTabs puts Your Network first once there's something in it: cables,
+// adapters, devices or systems. An empty library starts on Connect.
+function orderTabs() {
+  const c = index.counts;
+  const owned = (c.cable || 0) + (c.adapter || 0) + (c.devices || 0) + index.entries.filter((e) => e.kind === "system").length;
+  const nav = $("nav");
+  const network = nav.querySelector('[data-tab="network"]');
+  if (owned && nav.firstElementChild !== network) nav.prepend(network);
+  else if (!owned && nav.lastElementChild !== network) nav.append(network);
 }
 
 // --- start -----------------------------------------------------------------
