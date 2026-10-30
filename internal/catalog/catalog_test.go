@@ -132,13 +132,21 @@ func TestByConnectorIndex(t *testing.T) {
 }
 
 func TestLoadRejectsBadCatalogs(t *testing.T) {
-	base := "signals:\n  - {id: s, kind: data, name: S}\nconnectors:\n  - {id: a, family: x, name: A}\n  - {id: b, family: x, name: B}\n"
+	base := "signals:\n  - {id: s, kind: data, name: S}\nconnectors:\n  - {id: a, family: x, name: A}\n  - {id: b, family: x, name: B}\n" +
+		"glyphs:\n  default: {fill: '=', art: \"[#]\"}\n"
+	ok := base + "cables:\n  - {ends: [a:m, b:m], signals: [s], name: X}\n"
+	if _, err := catalog.Load(fstest.MapFS{"c.yaml": {Data: []byte(ok)}}, "test"); err != nil {
+		t.Fatalf("valid catalog rejected: %v", err)
+	}
 	for name, body := range map[string]string{
 		"unknown connector": base + "cables:\n  - {ends: [a:m, nope:m], signals: [s], name: X}\n",
 		"unknown signal":    base + "cables:\n  - {ends: [a:m, b:m], signals: [nope], name: X}\n",
 		"one end":           base + "cables:\n  - {ends: [a:m], signals: [s], name: X}\n",
 		"duplicate key":     base + "cables:\n  - {ends: [a:m, b:m], signals: [s], name: X}\n  - {ends: [b:m, a:m], signals: [s], name: Y}\n",
 		"bad gender":        base + "cables:\n  - {ends: [a:x, b:m], signals: [s], name: X}\n",
+		"glyph for nothing": strings.Replace(ok, "glyphs:\n", "glyphs:\n  nope: {fill: '=', art: x}\n", 1),
+		"wide glyph":        strings.Replace(ok, "glyphs:\n", "glyphs:\n  a: {fill: '=', art: \"123456789012345\"}\n", 1),
+		"no default glyph":  strings.Replace(ok, "  default:", "  a:", 1),
 	} {
 		fsys := fstest.MapFS{"c.yaml": {Data: []byte(body)}}
 		if _, err := catalog.Load(fsys, "test"); err == nil {

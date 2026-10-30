@@ -26,6 +26,8 @@ cbl ls --free --type usb-c                      # filter by status or connector
 cbl ls --summary                                # one line per type
 cbl rm <id|name>
 cbl adapter add|ls|rm ...                       # adapters have their own inventory
+cbl show "grey ps2 av"                          # draw an item's ends side by side
+cbl show usb-a usb-c                            # ...or any catalog type
 
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
@@ -40,6 +42,8 @@ cbl find aux --timing     # print load and query times
 | --- | --- |
 | `catalog/*.yaml` | The bundled catalog: signals, connectors, cable and adapter types. Compiled into the binary. |
 | `internal/catalog` | Loads and validates the catalog; builds the hashmap indexes and search. |
+| `catalog/glyphs.yaml` | ASCII outline per connector (`#` = contacts: filled on plugs, blank on sockets). |
+| `internal/outline` | Draws a part's ends side by side; golden tests in `testdata/` (`go test ./internal/outline -update` to refresh). |
 | `internal/library` | The user's own data in SQLite (WAL), with numbered migrations. |
 | `cmd/cbl` | The CLI. |
 

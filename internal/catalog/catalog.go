@@ -57,6 +57,7 @@ type Catalog struct {
 	ByConnector map[string][]*Part
 	BySignal    map[string][]*Part
 
+	glyphs  map[string]Glyph // connector id, "family:<name>" or "default"
 	aliases map[string][]Ref // normalised name -> what it names
 	terms   []term           // sorted, for prefix search
 }
@@ -73,11 +74,18 @@ type rawPart struct {
 	Note    string
 }
 
+type rawGlyph struct {
+	Fill   string
+	Art    string
+	Female string
+}
+
 type rawFile struct {
 	Signals    []Signal
 	Connectors []Connector
 	Cables     []rawPart
 	Adapters   []rawPart
+	Glyphs     map[string]rawGlyph
 }
 
 // Load reads every *.yaml file in fsys, validates cross-references and builds
@@ -102,6 +110,12 @@ func Load(fsys fs.FS, version string) (*Catalog, error) {
 		all.Connectors = append(all.Connectors, f.Connectors...)
 		all.Cables = append(all.Cables, f.Cables...)
 		all.Adapters = append(all.Adapters, f.Adapters...)
+		for k, g := range f.Glyphs {
+			if all.Glyphs == nil {
+				all.Glyphs = map[string]rawGlyph{}
+			}
+			all.Glyphs[k] = g
+		}
 	}
 	return build(all, version)
 }
@@ -115,6 +129,7 @@ func build(raw rawFile, version string) (*Catalog, error) {
 		Adapters:    make(map[string]*Part, len(raw.Adapters)),
 		ByConnector: make(map[string][]*Part),
 		BySignal:    make(map[string][]*Part),
+		glyphs:      make(map[string]Glyph),
 		aliases:     make(map[string][]Ref),
 	}
 	var errs []error
@@ -152,6 +167,9 @@ func build(raw rawFile, version string) (*Catalog, error) {
 	}
 	addParts(KindCable, raw.Cables, c.Cables)
 	addParts(KindAdapter, raw.Adapters, c.Adapters)
+	if err := c.addGlyphs(raw.Glyphs); err != nil {
+		errs = append(errs, err)
+	}
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}

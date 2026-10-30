@@ -1,0 +1,271 @@
+# Outline glyphs for `cbl show`. Keys are connector IDs, "family:<name>" as a
+# fallback for a whole family, and "default" for anything else. In the art,
+# '#' is the contact area: drawn with `fill` on a male end, left blank on a
+# female end (a socket). A glyph whose socket looks nothing like its plug
+# (a headphone jack) adds `female` art. Plain ASCII only; 14 columns at most.
+glyphs:
+  default:
+    fill: "="
+    art: |2
+      .--------.
+      | ###### |
+      '--------'
+
+  # USB and Apple
+  usb-a:
+    fill: "="
+    art: |2
+      .----------.
+      | ######## |
+      '----------'
+  usb-a-3.0:
+    fill: "="
+    art: |2
+      .----------.
+      |SS######  |
+      '----------'
+  usb-b:
+    fill: "="
+    art: |2
+       .-----.
+      / ##### \
+      |_______|
+  usb-b-3.0:
+    fill: "="
+    art: |2
+       .-------.
+      / ##SS### \
+      |_________|
+  usb-c:
+    fill: "="
+    art: |2
+      .--------.
+      ( ###### )
+      '--------'
+  micro-usb:
+    fill: "="
+    art: |2
+      .------.
+       \####/
+        '--'
+  micro-usb-3.0:
+    fill: "="
+    art: |2
+      .------.-----.
+       \####/ \###/
+        '--'   '-'
+  mini-usb:
+    fill: "="
+    art: |2
+      .------.
+      |\####/|
+      '------'
+  lightning:
+    fill: "="
+    art: |2
+      .-------.
+      | ##### |
+      '-------'
+  apple-30pin:
+    fill: ":"
+    art: |2
+      .------------.
+      |############|
+      '------------'
+
+  # Video
+  hdmi:
+    fill: "="
+    art: |2
+      .----------.
+      \ ######## /
+       '--------'
+  mini-hdmi:
+    fill: "="
+    art: |2
+      .-------.
+      \ ##### /
+       '-----'
+  micro-hdmi:
+    fill: "="
+    art: |2
+      .-----.
+      |\###/|
+      '-----'
+  displayport:
+    fill: "="
+    art: |2
+      .----------.
+      | ######## /
+      '---------'
+  mini-displayport:
+    fill: "="
+    art: |2
+      .-------.
+      \ ##### |
+       '------'
+  family:video:
+    fill: ":"
+    art: |2
+      .------------.
+      \ ########## /
+       '----------'
+  mini-dvi:
+    fill: ":"
+    art: |2
+      .--------.
+      \ ###### /
+       '------'
+  scart:
+    fill: ":"
+    art: |2
+      .------------.
+      | ########## \
+      '------------'
+  s-video:
+    fill: "o"
+    art: |2
+       .-----.
+      ( #   # )
+       '-#-#-'
+  rca:
+    fill: "o"
+    art: |2
+      (#)
+  ps2-avmulti:
+    fill: "="
+    art: |2
+      .------------.
+      | [########] |
+      '------------'
+  coax-f:
+    fill: "o"
+    art: |2
+        .-.
+      -| # |-
+        '-'
+
+  # Audio
+  trs-3.5:
+    fill: "="
+    art: |2
+      .--.
+      |##|=====>
+      '--'
+    female: |2
+       .---.
+      (  o  )
+       '---'
+  trrs-3.5:
+    fill: "="
+    art: |2
+      .--.
+      |##|==-=-=>
+      '--'
+    female: |2
+       .---.
+      (  o  )
+       '---'
+  trs-6.35:
+    fill: "="
+    art: |2
+      .---.
+      |###|=======>
+      '---'
+    female: |2
+       .-----.
+      (   O   )
+       '-----'
+  toslink:
+    fill: "o"
+    art: |2
+      .-----.
+      [  #  ]
+      '-----'
+
+  # Network and storage
+  rj45:
+    fill: "="
+    art: |2
+      .--------.
+      |########|
+      '-.____.-'
+  sata:
+    fill: "="
+    art: |2
+      .----------.
+      |#########_|
+      '----------'
+  esata:
+    fill: "="
+    art: |2
+      .----------.
+      <##########>
+      '----------'
+  family:card:
+    fill: ":"
+    art: |2
+       .-----.
+      /######|
+      '------'
+  cf:
+    fill: ":"
+    art: |2
+      .---------.
+      |#########|
+      '---------'
+
+  # Power
+  nema-1-15:
+    fill: "|"
+    art: |2
+      .-------.
+      | #   # |
+      '-------'
+  nema-5-15:
+    fill: "|"
+    art: |2
+      .-------.
+      | #   # |
+      |   o   |
+      '-------'
+  cee-7-16:
+    fill: "o"
+    art: |2
+       .-----.
+      ( #   # )
+       '-----'
+  iec-c7:
+    fill: "o"
+    art: |2
+      .---.---.
+      ( #   # )
+      '---'---'
+  iec-c5:
+    fill: "o"
+    art: |2
+      .--.-.--.
+      ( # # # )
+      '--'-'--'
+  iec-c13:
+    fill: "o"
+    art: |2
+      .-------.
+      | # # # |
+      \_______/
+  dc-barrel:
+    fill: "="
+    art: |2
+       .----.
+      =|####|=o
+       '----'
+    female: |2
+      .-----.
+      | (o) |
+      '-----'
+  3ds-dc:
+    fill: "="
+    art: |2
+      .------.
+      |#    #|
+      '------'

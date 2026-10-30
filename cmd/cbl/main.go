@@ -30,7 +30,7 @@ func newRoot() *cobra.Command {
 	}
 	root.PersistentFlags().BoolVar(&timing, "timing", false, "print load and query times to stderr")
 	root.AddCommand(
-		findCmd(), catalogCmd(), doctorCmd(),
+		findCmd(), showCmd(), catalogCmd(), doctorCmd(),
 		addCmd(catalog.KindCable), lsCmd(catalog.KindCable), rmCmd(catalog.KindCable), adapterCmd(),
 	)
 	return root

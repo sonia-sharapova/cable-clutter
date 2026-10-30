@@ -1,0 +1,4 @@
+3.5 mm stereo jack (M)
+.--.                                RCA x2 (M)
+|==|=====>~~~~~~~~~~~~~~~~~~~~~~~~~~(o) white   audio L
+'--'                                (o) red     audio R

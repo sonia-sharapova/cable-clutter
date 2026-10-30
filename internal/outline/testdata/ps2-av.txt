@@ -1,0 +1,4 @@
+PlayStation AV Multi Out (M)              RCA x3 (M)
+.------------.                            (o) yellow  video
+| [========] |~~~~~~~~~~~~~~~~~~~~~~~~~~~~(o) white   audio L
+'------------'                            (o) red     audio R

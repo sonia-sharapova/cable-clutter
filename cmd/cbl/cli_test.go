@@ -84,3 +84,30 @@ func TestAddExplainsProblems(t *testing.T) {
 		t.Error("rm of a missing item succeeded")
 	}
 }
+
+func TestShow(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "add", "ps2-avmulti", "rca*3", "--name", "grey ps2 av", "--for", "PS2", "--where", "drawer 2")
+
+	out := mustRun(t, "show", "grey ps2 av")
+	for _, want := range []string{"PlayStation AV Multi Out (M)", "(o) yellow  video", "grey ps2 av", "drawer 2", "for PS2", "FREE", "Carries: Composite video"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("show item missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "\x1b[") {
+		t.Error("colour codes written to a non-terminal")
+	}
+
+	out = mustRun(t, "show", "aux", "rca")
+	if !strings.Contains(out, "3.5 mm to RCA stereo breakout") || !strings.Contains(out, "You don't own one.") {
+		t.Errorf("show type:\n%s", out)
+	}
+	out = mustRun(t, "show", "usb-c hub with card reader")
+	if !strings.Contains(out, "SD card (F)") {
+		t.Errorf("show adapter type:\n%s", out)
+	}
+	if _, err := run(t, "show", "toaster"); err == nil {
+		t.Error("show of an unknown thing succeeded")
+	}
+}
