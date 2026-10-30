@@ -17,6 +17,16 @@ go test -run x -bench . ./internal/catalog   # performance budgets
 ## Use
 
 ```sh
+cbl add usb-a usb-c --qty 4                     # log cables by their ends...
+cbl add ps2-avmulti 'rca*3' --for PS2 --where "drawer 2"
+cbl add "aux cable"                             # ...or by name
+cbl add 2-prong barrel --variant 8.5v           # pick a variant when ends are shared
+cbl ls                                          # every cable with its status
+cbl ls --free --type usb-c                      # filter by status or connector
+cbl ls --summary                                # one line per type
+cbl rm <id|name>
+cbl adapter add|ls|rm ...                       # adapters have their own inventory
+
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals

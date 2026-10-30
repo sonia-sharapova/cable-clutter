@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"text/tabwriter"
 	"time"
@@ -27,7 +26,7 @@ func catalogCmd() *cobra.Command {
 			if len(args) == 1 {
 				what = args[0]
 			}
-			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 			defer tw.Flush()
 			switch what {
 			case "connectors":
@@ -77,7 +76,7 @@ func doctorCmd() *cobra.Command {
 				return err
 			}
 			loadTime := time.Since(start)
-			fmt.Printf("catalog   v%s: %d connectors, %d cables, %d adapters, %d signals (loaded in %s)\n",
+			fmt.Fprintf(cmd.OutOrStdout(), "catalog   v%s: %d connectors, %d cables, %d adapters, %d signals (loaded in %s)\n",
 				c.Version, len(c.Connectors), len(c.Cables), len(c.Adapters), len(c.Signals), loadTime.Round(time.Microsecond))
 
 			path, err := library.DefaultPath()
@@ -93,7 +92,7 @@ func doctorCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("library   %s (schema v%d of %d)\n", db.Path, v, library.LatestVersion())
+			fmt.Fprintf(cmd.OutOrStdout(), "library   %s (schema v%d of %d)\n", db.Path, v, library.LatestVersion())
 			return nil
 		},
 	}

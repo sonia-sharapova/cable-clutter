@@ -15,6 +15,13 @@ import (
 var timing bool
 
 func main() {
+	if err := newRoot().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "cbl:", err)
+		os.Exit(1)
+	}
+}
+
+func newRoot() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "cbl",
 		Short:         "Cable Clutter: know your cables, ports and what you're missing",
@@ -22,11 +29,11 @@ func main() {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().BoolVar(&timing, "timing", false, "print load and query times to stderr")
-	root.AddCommand(findCmd(), catalogCmd(), doctorCmd())
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "cbl:", err)
-		os.Exit(1)
-	}
+	root.AddCommand(
+		findCmd(), catalogCmd(), doctorCmd(),
+		addCmd(catalog.KindCable), lsCmd(catalog.KindCable), rmCmd(catalog.KindCable), adapterCmd(),
+	)
+	return root
 }
 
 func loadCatalog() (*catalog.Catalog, error) {

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -33,7 +32,7 @@ func findCmd() *cobra.Command {
 			if len(refs) == 0 {
 				return fmt.Errorf("nothing matches %q", q)
 			}
-			printFind(os.Stdout, c, refs)
+			printFind(cmd.OutOrStdout(), c, refs)
 			return nil
 		},
 	}

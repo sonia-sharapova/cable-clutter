@@ -65,6 +65,7 @@ cables:
   - {ends: [nema-1-15:m, dc-barrel:m], variant: 8.5v, volts: 8.5, signals: [power.dc], name: "AC adaptor 8.5 V (PlayStation 2 slim)"}
   - {ends: [nema-1-15:m, dc-barrel:m], variant: 5v-2a, volts: 5, amps: 2, signals: [power.dc], name: "AC adaptor 5 V 2 A (PSP)"}
   - {ends: [nema-5-15:m, dc-barrel:m], variant: 9v, volts: 9, signals: [power.dc], name: "AC adaptor 9 V (3-prong)"}
+  - {ends: [nema-1-15:m, dc-barrel:m], variant: unknown, signals: [power.dc], name: "AC adaptor, 2-prong (output unknown)", note: "Check the label on the brick, then re-add it with its voltage"}
   - {ends: [nema-1-15:m, micro-usb:m], variant: 5v, volts: 5, signals: [power.usb], name: "Micro-USB power supply (Raspberry Pi 3 and earlier)"}
   - {ends: [nema-1-15:m, usb-c:m], variant: 5v-3a, volts: 5, amps: 3, signals: [power.usb], name: "USB-C power supply (Raspberry Pi 4)"}
   - {ends: [nema-1-15:m, 3ds-dc:m], variant: 4.6v, volts: 4.6, amps: 0.9, signals: [power.dc], name: "Nintendo 3DS AC adaptor"}
