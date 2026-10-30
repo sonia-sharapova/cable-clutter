@@ -93,6 +93,10 @@ func newServer() http.Handler {
 	mux.HandleFunc("POST /api/wish/add", api(wishAddHandler))
 	mux.HandleFunc("POST /api/wish/done", api(wishDoneHandler))
 	mux.HandleFunc("GET /api/explore", api(exploreHandler))
+	mux.HandleFunc("POST /api/demo", api(func(st *state, _ *http.Request) (any, error) {
+		done, err := st.seedDemo()
+		return map[string]any{"added": done}, err
+	}))
 	mux.HandleFunc("GET /api/devices", api(devicesHandler))
 	mux.HandleFunc("POST /api/device/add", api(deviceAddHandler))
 	mux.HandleFunc("POST /api/device/owner", api(deviceOwnerHandler))
@@ -344,7 +348,45 @@ func systemHandler(st *state, r *http.Request) (any, error) {
 		}
 	}
 	v["part_names"], v["short_ids"] = names, items
+	v["activity"] = st.linkActivity(s)
 	return v, nil
+}
+
+// linkActivity says, for each link of s, which of your items it uses (or
+// would use when switched on) and whether that cable is available.
+func (st *state) linkActivity(s *library.System) map[string]map[string]string {
+	out := map[string]map[string]string{}
+	links := st.links[s.ID]
+	for _, l := range links {
+		switch {
+		case l.Direct():
+			out[l.ID] = map[string]string{"status": "its own lead"}
+		case s.Active && l.Assigned != "":
+			out[l.ID] = map[string]string{"status": "in use", "item": st.shortID(l.Assigned)}
+		}
+	}
+	if s.Active {
+		return out
+	}
+	picks, short := plan.Allocate(st.c, links, st.inv)
+	for _, p := range picks {
+		out[p.Link.ID] = map[string]string{"status": "available", "item": p.Item.ShortID()}
+	}
+	for _, sh := range short {
+		status := "missing: you don't own one"
+		if len(sh.HeldBy) > 0 {
+			status = "in use by " + strings.Join(sh.HeldBy, ", ")
+		}
+		out[sh.Link.ID] = map[string]string{"status": status}
+	}
+	return out
+}
+
+func (st *state) shortID(itemID string) string {
+	if it := st.item(itemID); it != nil {
+		return it.ShortID()
+	}
+	return ""
 }
 
 func connectHandler(st *state, r *http.Request) (any, error) {
@@ -429,18 +471,24 @@ func systemUpHandler(st *state, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var missing []string
+	missing, blocked := st.upReasons(up)
+	// What a purchase would fix: types you own too few of, and a second of
+	// each cable another system is holding.
+	wish := []map[string]string{}
+	seen := map[string]bool{}
+	addWish := func(key string) {
+		if key != "" && !seen[key] {
+			seen[key] = true
+			wish = append(wish, map[string]string{"key": key, "name": st.partName(key)})
+		}
+	}
 	for _, m := range up.Missing {
-		missing = append(missing, fmt.Sprintf("%d × %s (you own %d)", m.Need, st.partName(m.PartKey), m.Owned))
+		addWish(m.PartKey)
 	}
-	var blocked []string
 	for _, sh := range up.Short {
-		blocked = append(blocked, fmt.Sprintf("%s is in use by %s", st.partName(sh.Link.PartKey), quoteAll(sh.HeldBy)))
+		addWish(sh.Link.PartKey)
 	}
-	for _, b := range up.Busy {
-		blocked = append(blocked, fmt.Sprintf("%s is taken by %s", b.Port, quoteAll(b.HeldBy)))
-	}
-	return map[string]any{"up": up.Picks != nil, "took_down": up.TookDown, "missing": missing, "blocked": blocked}, nil
+	return map[string]any{"up": up.Up, "took_down": up.TookDown, "missing": missing, "blocked": blocked, "wish": wish}, nil
 }
 
 func systemDownHandler(st *state, r *http.Request) (any, error) {
@@ -762,11 +810,21 @@ func systemLinkHandler(st *state, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	added, err := st.db.AddLink(l)
+	var added *library.Link
+	out, err := st.whileOn(s, func() error {
+		added, err = st.db.AddLink(l)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	return linkView(added), nil
+	// The link as before, plus whether a system that was on came back on.
+	reply := struct {
+		linkJSON
+		Up         any `json:"up,omitempty"`
+		OffBecause any `json:"off_because,omitempty"`
+	}{linkJSON: linkView(added), Up: out["up"], OffBecause: out["off_because"]}
+	return reply, nil
 }
 
 func systemUnlinkHandler(st *state, r *http.Request) (any, error) {
@@ -779,10 +837,7 @@ func systemUnlinkHandler(st *state, r *http.Request) (any, error) {
 	for _, s := range st.systems {
 		for _, l := range st.links[s.ID] {
 			if l.ID == req.ID {
-				if s.Active {
-					return nil, fmt.Errorf("%q is on; switch it off first", s.Name)
-				}
-				return map[string]string{"removed": l.ID}, st.db.RemoveLink(l.ID)
+				return st.whileOn(s, func() error { return st.db.RemoveLink(l.ID) })
 			}
 		}
 	}
@@ -1047,9 +1102,6 @@ func systemAddDeviceHandler(st *state, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.Active {
-		return nil, fmt.Errorf("%q is on; switch it off first", s.Name)
-	}
 	a, err := st.ownedDevice(req.Device)
 	if err != nil {
 		return nil, err
@@ -1066,10 +1118,12 @@ func systemAddDeviceHandler(st *state, r *http.Request) (any, error) {
 	if !found(hops) {
 		return nil, fmt.Errorf("no way to connect %s and %s, even buying parts", a.Nickname, b.Nickname)
 	}
-	if err := st.addHops(s, hops, false); err != nil {
+	out, err := st.whileOn(s, func() error { return st.addHops(s, hops, false) })
+	if err != nil {
 		return nil, err
 	}
-	return map[string]string{"added": a.Nickname}, nil
+	out["added"] = a.Nickname
+	return out, nil
 }
 
 // systemRemoveDeviceHandler takes a device out of a system with every
@@ -1086,27 +1140,30 @@ func systemRemoveDeviceHandler(st *state, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.Active {
-		return nil, fmt.Errorf("%q is on; switch it off first", s.Name)
-	}
-	removed := 0
+	var gone []*library.Link
 	for _, chain := range linkChains(st.links[s.ID]) {
-		if !slices.ContainsFunc(chain, func(l *library.Link) bool {
+		if slices.ContainsFunc(chain, func(l *library.Link) bool {
 			return strings.EqualFold(l.FromDevice, req.Device) || strings.EqualFold(l.ToDevice, req.Device)
 		}) {
-			continue
-		}
-		for _, l := range chain {
-			if err := st.db.RemoveLink(l.ID); err != nil {
-				return nil, err
-			}
-			removed++
+			gone = append(gone, chain...)
 		}
 	}
-	if removed == 0 {
+	if len(gone) == 0 {
 		return nil, fmt.Errorf("%q isn't in %q", req.Device, s.Name)
 	}
-	return map[string]int{"removed": removed}, nil
+	out, err := st.whileOn(s, func() error {
+		for _, l := range gone {
+			if err := st.db.RemoveLink(l.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out["removed"] = len(gone)
+	return out, nil
 }
 
 // linkChains groups a system's links, in the order they were saved, into

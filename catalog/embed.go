@@ -8,7 +8,7 @@ import "embed"
 
 // Version identifies this catalog release. Bump it whenever a YAML file
 // changes, then run `go generate ./...`.
-const Version = "2026.10.7"
+const Version = "2026.10.8"
 
 //go:embed *.yaml
 var FS embed.FS

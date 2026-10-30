@@ -275,6 +275,16 @@ devices:
     ports:
       - {label: Lead, end: "trs-3.5:m", dir: in, signals: [audio.analog.stereo], note: "Its own cable: plugs straight into a headphone jack"}
 
+  - id: generic-usb-charger
+    name: "USB wall charger (generic)"
+    aliases: [usb charger, wall charger, phone charger, usb power adapter, power brick]
+    category: charger
+    generic: true
+    confirmed: false
+    assumption: "a 5 V wall charger with one USB-A socket"
+    ports:
+      - {label: USB-A, end: "usb-a:f", dir: out, volts: 5, signals: [power.usb]}
+
   # Named models.
   - id: logitech-mx-master-3s
     name: "Logitech MX Master 3S"

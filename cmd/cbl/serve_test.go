@@ -570,4 +570,15 @@ func TestServeDirectPlugIn(t *testing.T) {
 	if out := mustRun(t, "device", "ls"); !strings.Contains(out, "Alex") {
 		t.Errorf("owner missing from device ls:\n%s", out)
 	}
+
+	// Editing while it's on: it goes off for the change and comes back on.
+	if code, v := post("/api/system/remove-device", `{"system":"Pi desk","device":"Keyboard"}`); code != 200 || v["up"] != true {
+		t.Errorf("remove while on: %d %v", code, v)
+	}
+	if code, v := post("/api/system/add-device", `{"system":"Pi desk","device":"Keyboard","to":"Pi"}`); code != 200 || v["up"] != true {
+		t.Errorf("add while on: %d %v", code, v)
+	}
+	if out := mustRun(t, "system", "show", "Pi desk"); !strings.Contains(out, "· UP") || !strings.Contains(out, "Keyboard") {
+		t.Errorf("after editing while on:\n%s", out)
+	}
 }

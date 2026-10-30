@@ -420,6 +420,7 @@ type upAttempt struct {
 	Busy     []plan.PortClash // device ports other systems fill
 	TookDown []string         // systems taken down by switchOver
 	Picks    []plan.Pick      // the items now in use
+	Up       bool             // it came up
 }
 
 // bringUp brings s up if every link gets an item and every port is free.
@@ -470,8 +471,54 @@ func (st *state) bringUp(s *library.System, switchOver bool) (*upAttempt, error)
 	if err := st.db.BringUp(s.ID, assigned); err != nil {
 		return nil, err
 	}
-	up.Picks = picks
+	up.Picks, up.Up = picks, true
 	return up, nil
+}
+
+// whileOn makes a change to a system. One that's on is switched off for the
+// change and back on after, so its cables are picked afresh; if it can't
+// come back on (a cable it now needs is busy elsewhere), it stays off and
+// the reply says why.
+func (st *state) whileOn(s *library.System, change func() error) (map[string]any, error) {
+	out := map[string]any{}
+	if !s.Active {
+		return out, change()
+	}
+	if err := st.db.TakeDown(s.ID); err != nil {
+		return nil, err
+	}
+	changeErr := change()
+	if err := st.reload(); err != nil {
+		return nil, err
+	}
+	up, err := st.bringUp(s, false)
+	if err != nil {
+		return nil, err
+	}
+	if changeErr != nil {
+		return nil, changeErr
+	}
+	out["up"] = up.Up
+	if !up.Up {
+		missing, blocked := st.upReasons(up)
+		out["off_because"] = append(missing, blocked...)
+	}
+	return out, nil
+}
+
+// upReasons says why a system didn't come up: what you don't own enough
+// of, and what other systems are holding.
+func (st *state) upReasons(up *upAttempt) (missing, blocked []string) {
+	for _, m := range up.Missing {
+		missing = append(missing, fmt.Sprintf("needs %d × %s (you own %d)", m.Need, st.partName(m.PartKey), m.Owned))
+	}
+	for _, sh := range up.Short {
+		blocked = append(blocked, fmt.Sprintf("%s is in use by %s", st.partName(sh.Link.PartKey), quoteAll(sh.HeldBy)))
+	}
+	for _, b := range up.Busy {
+		blocked = append(blocked, fmt.Sprintf("%s is taken by %s", b.Port, quoteAll(b.HeldBy)))
+	}
+	return missing, blocked
 }
 
 // conflict explains why a system can't come up and what to do about it.

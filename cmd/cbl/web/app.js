@@ -168,20 +168,67 @@ function openEntry(id) {
   location.hash = "#" + id.slice(0, i) + "/" + encodeURIComponent(id.slice(i + 1));
 }
 
+// --- where things are: sections, their sub-pages, and the trail -----------
+
+const SECTIONS = {
+  route: { label: "Connect" },
+  network: { label: "Your Network", subs: [["systems", "Systems"], ["inventory", "Inventory"], ["devices", "Devices"], ["wish", "Wishlist"]] },
+  explore: { label: "Explore", subs: [["cables", "Cables"], ["adapters", "Adapters"], ["devices", "Devices"]] },
+};
+// Addresses from before the sections, kept working.
+const MOVED = { systems: "network/systems", inventory: "network/inventory", wish: "network/wish", connect: "route",
+  network: "network/inventory", explore: "explore/cables", home: "route" };
+
+// trail draws the sub-navigation for a section and the path above the page:
+// Home / Your network / Systems / Pi desk. Detail pages call it again once
+// they know where they belong.
+function trail(section, sub, leaf) {
+  // Systems has its own tab; the rest of Your Network shares one.
+  const tab = section === "network" && sub === "systems" ? "systems" : section;
+  for (const a of document.querySelectorAll("nav a")) a.toggleAttribute("aria-current", a.dataset.tab === tab);
+  const s = SECTIONS[section];
+  const subnav = $("#subnav");
+  subnav.hidden = !s?.subs;
+  fill(subnav, (s?.subs || []).map(([id, label]) =>
+    el("a", { href: `#${section}/${id}`, "aria-current": id === sub && !leaf ? "page" : null, class: id === sub ? "here" : null }, label)));
+  const steps = [["Home", "#route"]];
+  if (s) steps.push([s.label, s.subs ? `#${section}/${s.subs[0][0]}` : "#" + section]);
+  const subLabel = s?.subs?.find(([id]) => id === sub)?.[1];
+  if (subLabel) steps.push([subLabel, `#${section}/${sub}`]);
+  if (leaf) steps.push([leaf, null]);
+  // Connect is the home page: no trail above it.
+  fill($("#crumbs"), section === "route" ? null : steps.map(([label, href], i) =>
+    el("li", {}, href && i < steps.length - 1 ? el("a", { href }, label) : el("span", { "aria-current": "page" }, label))));
+}
+
 async function route() {
   const hash = decodeURIComponent(location.hash.slice(1));
-  let [kind = "route", ...rest] = (hash || "route").split("/"); // the site opens on Route
-  if (kind === "connect") kind = "route"; // its old name
+  if (MOVED[hash]) return location.replace("#" + MOVED[hash]);
+  const [kind = "route", ...rest] = (hash || "route").split("/"); // the site opens on Connect
   const arg = rest.join("/");
-  for (const a of document.querySelectorAll("nav a")) {
-    a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + kind);
-  }
+  const owned = (name) => index.devices.includes(name);
+  // Each address: what draws it, and where it sits.
+  const pages = {
+    route: [showRoute, "route"],
+    network: [{ systems: showSystems, inventory: showInventory, devices: showNetworkDevices, wish: showWish }[arg], "network", arg],
+    explore: [{ cables: () => showExplore("cable"), adapters: () => showExplore("adapter"), devices: showExploreDevices }[arg], "explore", arg],
+    system: [showSystem, "network", "systems", arg],
+    device: [showDevice, owned(arg) ? "network" : "explore", "devices", arg],
+    model: [showDevice, "explore", "devices", arg],
+    part: [showPart, "explore", "cables", arg],
+    connector: [showConnector, "explore", "cables", arg],
+  };
+  const [render, section, sub, leaf] = pages[kind] || [];
+  trail(section, sub, leaf);
   const view = $("#view");
-  const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, inventory: showInventory, route: showRoute, explore: showExplore, systems: showSystems, wish: showWish }[kind];
-  if (!render) return;
+  if (!render) {
+    fill(view, el("p", { class: "meta" }, "No page here. ", el("a", { href: "#route" }, "Go home")));
+    return;
+  }
   fill(view, el("p", { class: "meta" }, "…"));
   try {
     fill(view, await render(arg));
+    window.scrollTo(0, 0);
   } catch (err) {
     fill(view, el("p", { class: "warn" }, err.message));
   }
@@ -192,6 +239,7 @@ async function route() {
 async function showPart(key) {
   const d = await api("/api/part?key=" + encodeURIComponent(key));
   const p = d.part;
+  trail("explore", p.kind === "adapter" ? "adapters" : "cables", p.name);
   return [
     el("h2", {}, p.name),
     el("p", { class: "meta" }, p.key, p.active ? " · active (has electronics)" : "", p.volts ? ` · ${p.volts} V` : ""),
@@ -215,8 +263,11 @@ async function showPart(key) {
 
 // --- explore: every cable and adapter in the catalog, filed by port type ----
 
-async function showExplore() {
-  const families = await api("/api/explore");
+async function showExplore(kind) {
+  // Only this kind's parts, and the connectors that still have some.
+  const families = (await api("/api/explore")).map((f) => ({ ...f, connectors: f.connectors
+    .map((c) => ({ ...c, parts: c.parts.filter((p) => p.kind === kind) })).filter((c) => c.parts.length) }))
+    .filter((f) => f.connectors.length);
   const list = el("div", {});
   const input = el("input", { type: "search", placeholder: "filter, e.g. usb", oninput: () => draw() });
   const total = new Set(families.flatMap((f) => f.connectors.flatMap((c) => c.parts.map((p) => p.key)))).size;
@@ -237,13 +288,13 @@ async function showExplore() {
           el("span", { class: "meta" }, `${c.parts.length}`)),
         el("ul", {}, c.parts.map((p) => el("li", {},
           el("a", { href: "#part/" + encodeURIComponent(p.key) }, p.name), " ",
-          el("span", { class: "meta" }, p.kind, p.owned ? ` · you own ${p.owned}` : "")))))))) : el("p", {}, "Nothing matches."));
+          el("span", { class: "meta" }, p.owned ? `you own ${p.owned}` : "")))))))) : el("p", {}, "Nothing matches."));
   }
   draw();
   return [
-    el("h2", {}, "Explore"),
-    el("p", { class: "meta" }, `All ${total} cable and adapter types in the catalog, by port type. Open a connector to see everything with that end.`),
-    el("div", { class: "toolbar" }, searchField(input)),
+    el("h2", {}, kind === "adapter" ? "Adapters" : "Cables"),
+    el("p", { class: "meta" }, `Catalogue of ${total} common ${kind} types, by port type. Open a connector to see its details.`),
+    el("div", { class: "toolbar catalogue" }, searchField(input)),
     list,
   ];
 }
@@ -251,6 +302,14 @@ async function showExplore() {
 // --- inventory: everything you own, filtered in the page ------------------
 
 // --- inventory: everything you own, filtered and searched in the page -----
+
+// abbreviate shortens a part name for the inventory's narrow column; the
+// full name shows above it on hover. "USB-A 3.0 to Micro-USB (charge/data)"
+// → "USB-A 3.0 → Micro-USB".
+function abbreviate(name) {
+  const short = name.replace(/\s*\(.*?\)\s*/g, " ").replace(/ to /g, " → ").replace(/\bcable\b/gi, "").replace(/\s+/g, " ").trim();
+  return short.length > 26 ? short.slice(0, 25).trimEnd() + "…" : short;
+}
 
 const invFilter = { kind: "all", category: "all", connector: "", status: "all", query: "", open: false };
 
@@ -316,7 +375,7 @@ async function showInventory() {
               const free = r.items.filter((it) => it.status === "free").length;
               return el("tr", {},
                 el("td", {}, el("pre", { class: "mini", title: r.ends.join(" ↔ ") }, r.outline)),
-                el("td", {}, el("a", { href: "#part/" + encodeURIComponent(r.key) }, r.name),
+                el("td", {}, el("a", { href: "#part/" + encodeURIComponent(r.key), class: "abbr", "data-full": r.name, "aria-label": r.name }, abbreviate(r.name)),
                   el("span", { class: "sub" }, r.kind, " · ", r.categories.join(", "))),
                 el("td", {}, r.items.length),
                 el("td", { class: free ? "can" : "cant", title: `${free} of ${r.items.length} available` }, free ? "yes" : "no"));
@@ -330,8 +389,42 @@ async function showInventory() {
     el("p", { class: "meta" }, `${total} items of ${rows.length} types.`),
     fill(bar, filterButton, searchBox, panel),
     list,
-    await yourDevices(),
     addNewForm(),
+  ];
+}
+
+async function showNetworkDevices() {
+  return [
+    el("h2", {}, "Devices"),
+    el("p", { class: "meta" }, "The devices you own, with make, model and owner. Open one for its ports and what you can plug into it."),
+    await yourDevices(),
+    addNewForm("device"),
+  ];
+}
+
+// showExploreDevices is every device model in the catalog, by category:
+// named models with their make, and generic types for when you don't know.
+async function showExploreDevices() {
+  const d = await api("/api/devices");
+  const input = el("input", { type: "search", placeholder: "filter, e.g. mouse", oninput: () => draw() });
+  const list = el("div", {});
+  const categories = [...new Set(d.models.map((m) => m.category || "other"))].sort();
+  function draw() {
+    const q = input.value.trim().toLowerCase();
+    const has = (m) => !q || [m.name, m.make, m.category].some((t) => (t || "").toLowerCase().includes(q));
+    const shown = categories.map((c) => [c, d.models.filter((m) => (m.category || "other") === c && has(m))]).filter(([, ms]) => ms.length);
+    fill(list, shown.length ? shown.map(([c, ms]) => el("section", { class: "family" },
+      el("h3", { class: "kind-head" }, c.toUpperCase()),
+      el("ul", { class: "models" }, ms.map((m) => el("li", {},
+        el("a", { href: "#model/" + encodeURIComponent(m.id) }, m.name), " ",
+        el("span", { class: "meta" }, m.generic ? "generic type" : m.make || "")))))) : el("p", {}, "Nothing matches."));
+  }
+  draw();
+  return [
+    el("h2", {}, "Devices"),
+    el("p", { class: "meta" }, `Catalogue of ${d.models.length} common devices, by category. Open one to see its ports; generic types stand in when you don't know the model.`),
+    el("div", { class: "toolbar catalogue" }, searchField(input)),
+    list,
   ];
 }
 
@@ -356,7 +449,6 @@ async function yourDevices() {
   };
   const sorted = d.devices.toSorted((a, b) => a.name.localeCompare(b.name));
   return el("section", { class: "your-devices" },
-    el("h3", {}, "Your devices"),
     el("table", { class: "devices" },
       el("tr", {}, ["name", "make", "model", "owner"].map((h) => el("th", {}, h))),
       sorted.map((x) => el("tr", {},
@@ -624,7 +716,11 @@ function linkEditor(b, { rows: startRows = 1 } = {}) {
   return node;
 }
 
+let systemFlash = null; // said once on the next system page
+
 async function showSystem(name) {
+  const flash = systemFlash;
+  systemFlash = null;
   const [d, b] = await Promise.all([api("/api/system?name=" + encodeURIComponent(name)), api("/api/builder")]);
   const msg = el("div", {});
   const toggle = async (sw) => {
@@ -632,17 +728,22 @@ async function showSystem(name) {
     await refresh();
     if (res.up === d.up) {
       // Didn't come up: say why, and offer to switch.
+      // Offer what the plan promises: switch the others off, or buy another.
       fill(msg,
         (res.missing || []).map((m) => el("p", { class: "warn" }, "Missing: " + m)),
         (res.blocked || []).map((x) => el("p", { class: "warn" }, x)),
-        res.blocked && res.blocked.length ? el("button", { onclick: () => toggle(true) }, "Switch those off and this on") : null);
+        el("div", { class: "row" },
+          res.blocked && res.blocked.length ? el("button", { onclick: () => toggle(true) }, "Switch those off and this on") : null,
+          res.wish && res.wish.length ? wishButton(res.wish, `so ${d.name} can be on`) : null));
       return;
     }
     route();
   };
   const post = async (path, body) => {
     try {
-      await api(path, body);
+      const res = await api(path, body);
+      // An edit to a system that was on: it went off and tried to come back.
+      if (res && res.up === false) systemFlash = ["Switched off after the change: ", (res.off_because || []).join("; ")];
       await refresh();
       route();
     } catch (err) {
@@ -660,7 +761,7 @@ async function showSystem(name) {
     return el("details", { class: "member" },
       el("summary", {}, el("a", { href: "#device/" + encodeURIComponent(name) }, name), " ",
         el("span", { class: "meta" }, dev ? `${dev.ports.length} port${dev.ports.length === 1 ? "" : "s"}` : ""), " ",
-        d.up ? null : el("button", { class: "quiet", title: `Take ${name} out, with the cables that reach it`,
+        el("button", { class: "quiet", title: `Take ${name} out, with the cables that reach it`,
           onclick: (e) => { e.preventDefault(); post("/api/system/remove-device", { system: d.name, device: name }); } }, "remove")),
       dev && dev.ports.length
         ? el("ul", {}, dev.ports.map((p) => el("li", {}, p.label, " ", el("span", { class: "meta" }, `${p.end} · ${dir[p.dir] || p.dir}`))))
@@ -669,44 +770,67 @@ async function showSystem(name) {
   const others = b.devices.filter((x) => x.model && !members.includes(x.name));
   const newDevice = el("select", {}, el("option", { value: "" }, "device"), others.map((x) => el("option", { value: x.name }, x.name)));
   const joinTo = el("select", {}, members.map((m) => el("option", { value: m }, m)));
-  const addDevice = d.up || !members.length ? null : el("div", { class: "row" },
+  const addDevice = !members.length ? null : el("div", { class: "row" },
     el("span", { class: "meta" }, "Add"), newDevice, el("span", { class: "meta" }, "connected to"), joinTo,
     el("button", { onclick: () => newDevice.value && post("/api/system/add-device", { system: d.name, device: newDevice.value, to: joinTo.value }) }, "Add device"));
   const del = el("button", { class: "quiet danger", onclick: () => {
     // Two clicks, no dialog: the first arms it for a few seconds.
-    if (del.dataset.armed) return post("/api/system/delete", { name: d.name }).then(() => (location.hash = "#systems"));
+    if (del.dataset.armed) return post("/api/system/delete", { name: d.name }).then(() => (location.hash = "#network/systems"));
     del.dataset.armed = "1";
     fill(del, "Click again to delete");
     setTimeout(() => { delete del.dataset.armed; fill(del, "Delete system"); }, 3000);
   } }, "Delete system");
+  // Switching off frees its cables: said beside the button on hover.
+  const power = d.up
+    ? el("div", { class: "row with-hint" }, el("button", { onclick: () => toggle(false) }, "Switch off"),
+        el("span", { class: "hint meta" }, "Switching off a system will mark associated cables as available (not in use)."))
+    : el("div", { class: "row" }, el("button", { onclick: () => toggle(false) }, "Switch on"));
+  const act = (l) => d.activity[l.id] || {};
+  const activityClass = (st) => st === "available" ? "can" : st === "in use" ? "inuse" : st && st.startsWith("its own") ? "meta" : "warn";
   return [
-    el("a", { href: "#systems", class: "meta" }, "← systems"),
     el("h2", {}, d.name, " ", statusTag(d.up ? "up" : "down")),
-    el("div", { class: "row" }, el("button", { onclick: () => toggle(false) }, d.up ? "Switch off" : "Switch on")),
+    power,
+    d.up ? el("p", { class: "meta" }, "It's on: a change switches it off and back on, picking its cables again.") : null,
+    flash ? el("p", { class: "warn" }, flash) : null,
     msg,
-    el("h3", {}, "Devices"),
-    members.length ? devices : el("p", { class: "meta" }, "None yet: add a cable below."),
-    addDevice,
-    el("h3", {}, "Cables"),
+    el("h3", {}, "Your cables in it"),
     d.links.length
-      ? el("table", {},
-          el("tr", {}, ["", "from → to", "cable", "item", ""].map((h) => el("th", {}, h))),
-          d.links.map((l, n) => el("tr", {},
-            el("td", { class: "meta" }, n + 1),
-            el("td", {}, endpoint(l.from_device, l.from_port), " → ", endpoint(l.to_device, l.to_port)),
+      ? el("table", { class: "system-cables" },
+          el("tr", {}, ["from", "to", "cable", "item #", "activity", ""].map((h) => el("th", {}, h))),
+          d.links.map((l) => el("tr", {},
+            el("td", {}, endpoint(l.from_device, l.from_port)),
+            el("td", {}, endpoint(l.to_device, l.to_port)),
             el("td", {}, l.part ? el("a", { href: "#part/" + encodeURIComponent(l.part) }, d.part_names[l.part]) : el("span", { class: "meta" }, "plugs straight in")),
-            el("td", { class: "meta" }, !l.part ? "its own lead" : l.assigned ? `your #${d.short_ids[l.assigned]}, in use` : l.preferred ? `your #${d.short_ids[l.preferred]}` : "open: any available"),
-            el("td", {}, d.up ? null : el("button", { class: "quiet", title: "Remove this cable", onclick: () => post("/api/system/unlink", { id: l.id }) }, "×")))))
+            el("td", { class: "meta" }, act(l).item ? "#" + act(l).item : ""),
+            el("td", { class: activityClass(act(l).status) }, act(l).status || ""),
+            el("td", {}, el("button", { class: "quiet", title: "Remove this cable", onclick: () => post("/api/system/unlink", { id: l.id }) }, "×")))))
       : el("p", { class: "meta" }, "No cables yet."),
     d.conflicts.map((c) => el("p", { class: "cant" }, `Can't be on with "${c.with}": `, c.port ? `both plug into ${c.port}` : `both need ${d.part_names[c.part] || c.part} (you own ${c.have})`)),
     d.missing.map((m) => el("p", { class: "warn" }, `Missing: needs ${m.need} × ${d.part_names[m.part] || m.part}, you own ${m.owned}`)),
-    d.up ? null : el("details", { class: "box" }, el("summary", {}, "Add a cable"),
+    el("details", { class: "box" }, el("summary", {}, "Add a cable"),
       adder,
       el("button", { onclick: async () => {
         for (const l of adder.value()) await post("/api/system/link", { system: d.name, ...l });
       } }, "Add")),
-    el("div", { class: "row" }, del),
+    el("h3", {}, "Devices"),
+    members.length ? devices : el("p", { class: "meta" }, "None yet: add a cable above."),
+    addDevice,
+    el("div", { class: "row end" }, del),
   ];
+}
+
+// demoButton does what `cbl demo` does: two example setups, a Raspberry Pi
+// desk and a laptop desk, with the devices and cables they need.
+function demoButton() {
+  const msg = el("span", { class: "meta" });
+  const button = el("button", { class: "quiet", onclick: async () => {
+    const res = await api("/api/demo", {});
+    await refresh();
+    if (res.added.length) return route();
+    button.disabled = true;
+    fill(msg, "They're already there.");
+  } }, "+ Load the example setups");
+  return el("div", { class: "row" }, button, el("span", { class: "meta" }, "a Raspberry Pi desk and a laptop desk"), msg);
 }
 
 async function showSystems() {
@@ -742,8 +866,9 @@ async function showSystems() {
     route();
   };
   return [
-    el("h2", {}, "Your systems"),
+    el("h2", {}, "Systems"),
     el("p", { class: "meta" }, "A system is a setup you switch on and off. Its cables are in use while it's on."),
+    demoButton(),
     systems.length
       ? el("table", {},
           el("tr", {}, ["", "system", "", ""].map((h) => el("th", {}, h))),
@@ -800,9 +925,10 @@ async function showRoute(arg) {
   to.addEventListener("change", () => fill(out));
   if (from.value && from.value === a && to.value === b) go();
   return [
-    el("h2", {}, "Find your connection"),
-    el("p", { class: "meta" }, "From one device's outputs to the other's inputs: your available cables first, then ones in use, then what to buy."),
-    el("div", { class: "row" }, from, el("span", {}, "→"), to, el("button", { onclick: go }, "Find a way")),
+    el("h2", { class: "page-title" }, "Find your connection:"),
+    el("p", { class: "intro" }, "Find the right cables for your devices. Select the equipment you want to connect, and we'll check your system configuration to tell you what you need or what you're missing."),
+    el("div", { class: "connect-pick" }, from, el("span", { class: "long-arrow", "aria-hidden": "true" }), to),
+    el("div", { class: "connect-go" }, el("button", { class: "primary", onclick: go }, "Connect")),
     out,
   ];
 }
@@ -842,8 +968,9 @@ function systemForm(d, from, to) {
     msg);
 }
 
-// bookmarkForm saves the route on show to Your systems → Bookmarks. Only
-// the two devices are kept: the cables are worked out again when it opens.
+// bookmarkForm saves the route on show to Your network → Systems →
+// Bookmarks. Only the two devices are kept: the cables are worked out again
+// when it opens.
 function bookmarkForm(from, to) {
   const name = el("input", { type: "text", class: "inline", placeholder: `name (optional), e.g. ${from} → ${to}` });
   const msg = el("span", { class: "meta" });
@@ -851,7 +978,7 @@ function bookmarkForm(from, to) {
     try {
       await api("/api/bookmark/add", { name: name.value, from, to });
       save.disabled = true;
-      fill(msg, "Saved to ", el("a", { href: "#systems" }, "Your systems"), ".");
+      fill(msg, "Saved to ", el("a", { href: "#network/systems" }, "Your network → Systems"), ".");
     } catch (err) {
       fill(msg, el("span", { class: "warn" }, err.message));
     }

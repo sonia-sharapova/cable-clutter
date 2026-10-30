@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -383,5 +386,43 @@ func TestSmartCommands(t *testing.T) {
 	mustRun(t, "graph", "--device", "PS2", "--format", "mermaid")
 	if _, err := run(t, "graph", "--format", "png"); err == nil {
 		t.Error("unknown format accepted")
+	}
+}
+
+func TestDemo(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	out := mustRun(t, "demo")
+	for _, want := range []string{"Created system Pi desk", "Created system Laptop desk", "USB charger charges Raspberry Pi", "to your inventory"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("demo output lacks %q:\n%s", want, out)
+		}
+	}
+	// Everything it needs is owned, so both can be switched on.
+	mustRun(t, "system", "up", "Pi desk")
+	pi := mustRun(t, "system", "show", "Pi desk")
+	for _, want := range []string{"Keyboard", "Mouse", "Dell monitor", "Power", "· UP"} {
+		if !strings.Contains(pi, want) {
+			t.Errorf("Pi desk lacks %q:\n%s", want, pi)
+		}
+	}
+	// The web page's system view says what each cable is doing.
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	res, err := http.Get(srv.URL + "/api/system?name=" + url.QueryEscape("Pi desk"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct{ Activity map[string]map[string]string }
+	json.NewDecoder(res.Body).Decode(&v)
+	res.Body.Close()
+	statuses := map[string]int{}
+	for _, a := range v.Activity {
+		statuses[a["status"]]++
+	}
+	if statuses["in use"] != 2 || statuses["its own lead"] != 2 {
+		t.Errorf("activity while up = %v, want 2 in use and 2 own leads", statuses)
+	}
+	if again := mustRun(t, "demo"); !strings.Contains(again, "already there") {
+		t.Errorf("a second run should change nothing:\n%s", again)
 	}
 }

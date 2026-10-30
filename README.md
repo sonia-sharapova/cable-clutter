@@ -4,13 +4,46 @@ Platform that helps people organize and make sense of their cables and wires.
 `cbl` is an offline-first CLI: log the cables and adapters you own, look up
 what a device's ports do, and find out what you're missing to hook things up.
 
-## Install
+## Set it up from GitHub
 
-```sh
-go install github.com/sonia-sharapova/cable-clutter/cmd/cbl@latest
-# after the first tagged release:
-brew install sonia-sharapova/tap/cbl
-```
+Works on macOS and Linux. Everything stays on your computer: no account, no
+server, no network after the download.
+
+1. **Install Go 1.27 or newer** from [go.dev/dl](https://go.dev/dl/) (on a Mac,
+   `brew install go` also works). Check with `go version`.
+2. **Get the code and build it:**
+   ```sh
+   git clone https://github.com/sonia-sharapova/cable-clutter.git
+   cd cable-clutter
+   go install ./cmd/cbl
+   ```
+   This puts `cbl` in `~/go/bin`. If `cbl` isn't found afterwards, add that
+   folder to your PATH: `echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.zshrc`
+   (or `~/.bashrc`), then open a new terminal.
+3. **Check it works:** `cbl doctor` prints the catalog size and where your
+   library will live.
+4. **Load the examples (optional):** `cbl demo` adds two ready-made setups, a
+   Raspberry Pi desk (monitor, keyboard, mouse, charger) and a laptop desk
+   (monitor, speaker), with the devices and cables they need. Running it again
+   changes nothing. To try it without touching your own library, run
+   `CBL_HOME=/tmp/cbl-try cbl demo` (and the same `CBL_HOME` for the next steps).
+5. **Open the web page:** `cbl serve --open`. It runs at
+   [127.0.0.1:7878](http://127.0.0.1:7878), only on this computer; stop it with
+   Ctrl-C. The page and the commands share one library.
+6. **Add your own things,** on the page (Your network → Inventory or Devices)
+   or in the terminal:
+   ```sh
+   cbl add usb-a usb-c --qty 2               # cables, by their two ends
+   cbl device add raspberry-pi-3b --name Pi  # devices, by catalog model
+   cbl catalog devices                       # the models it knows
+   cbl connect Pi "Dell monitor"             # how to hook two things up
+   ```
+7. **Back up** now and then: `cbl export -o backup.json`.
+8. **Update** later with `git pull && go install ./cmd/cbl`. Your library is
+   kept and upgraded in place.
+
+Without cloning, `go install github.com/sonia-sharapova/cable-clutter/cmd/cbl@latest`
+does step 2's build in one line.
 
 ## Develop
 
@@ -44,7 +77,10 @@ cbl adapter add|ls|rm ...                       # adapters have their own invent
 cbl show "grey ps2 av"                          # draw an item's ends side by side
 cbl show usb-a usb-c                            # ...or any catalog type
 
+cbl demo                                        # load the Pi desk and laptop desk examples
 cbl device add ps2-slim --name PS2              # record a device you own
+cbl device add generic-usb-mouse --name Mouse --owner Alex
+                                                # generic types when you don't know the model
 cbl device PS2                                  # its ports: what each does, what you
                                                 #   can connect now, what you're missing
 cbl device ls / rm

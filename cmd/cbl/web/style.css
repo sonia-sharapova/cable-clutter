@@ -51,6 +51,41 @@ nav a:last-child { margin-right: 0; }
 nav a:hover { color: var(--color-hover); }
 nav a[aria-current] { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
 nav a[aria-current]:hover { color: var(--color-hover); }
+/* Tabs separated by dots, as in the design. */
+nav a:not(:last-child)::after { content: "·"; display: inline-block; margin-left: var(--pad-large); color: var(--color-sub); }
+/* Connect, the home page: a title, a line on what it does, then the two
+   devices either side of a long arrow and one button under them. */
+.page-title { font-size: 1.3rem !important; margin-top: var(--pad-xlarge) !important; }
+.intro { max-width: 36rem; font-size: 0.95rem; }
+.connect-pick { display: flex; align-items: center; justify-content: center; gap: var(--pad-large); flex-wrap: wrap; margin: var(--pad-xlarge) 0 var(--pad-large); }
+.connect-pick select { min-width: 9rem; padding: 0.5rem 0.65rem; font-size: 0.8rem; }
+.long-arrow { position: relative; width: 6rem; height: 1px; background: var(--color-primary); }
+.long-arrow::after { content: ""; position: absolute; right: 0; top: -4px; width: 8px; height: 8px; border-top: 1px solid; border-right: 1px solid; transform: rotate(45deg); }
+.connect-go { display: flex; justify-content: center; margin-bottom: var(--pad-xlarge); }
+button.primary { background: #f5dd8b; border-color: transparent; padding: 0.55rem 1.1rem; font-size: 0.8rem; }
+button.primary:hover { background: #ecd072; }
+/* A catalogue's own search: left, close to the list, ruled off from it. */
+.toolbar.catalogue { margin: var(--pad-large) 0 0; padding-bottom: 0.35rem; border-bottom: 1px solid rgb(0 0 0 / 0.18); }
+.toolbar.catalogue .searchbox { margin: 0; }
+.toolbar.catalogue + div > .family:first-child h3 { margin-top: var(--pad) !important; }
+/* A shortened name with the full one above it on hover. */
+a.abbr { position: relative; }
+a.abbr:hover::after, a.abbr:focus-visible::after {
+  content: attr(data-full); position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 5; white-space: nowrap;
+  background: var(--color-primary); color: var(--color-bg); font-family: var(--monospace); font-size: var(--font-small);
+  padding: 0.2rem 0.45rem; pointer-events: none;
+}
+/* Sub-pages of a section, then the path to this page. */
+.subnav { display: flex; flex-wrap: wrap; gap: var(--pad) var(--pad-large); margin: 0 0 var(--pad); font-family: var(--monospace); font-size: 0.8rem; }
+.subnav a { color: var(--color-sub); text-decoration: none; }
+.subnav a:hover { color: var(--color-hover); }
+.subnav a.here { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
+.crumbs { list-style: none; display: flex; flex-wrap: wrap; font-family: var(--monospace); font-size: var(--font-small); color: var(--color-sub); }
+.crumbs li + li::before { content: "/"; margin: 0 0.45rem; color: rgb(0 0 0 / 0.3); }
+.crumbs a { color: var(--color-sub); }
+.crumbs a:hover { color: var(--color-hover); }
+.crumbs [aria-current] { color: var(--color-primary); }
+ul.models { list-style: none; }
 /* Finer, smaller and lighter than the tabs, with a drawn magnifying glass. */
 .searchbox {
   display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0 auto;
@@ -198,6 +233,12 @@ table.devices { table-layout: fixed; }
 table.devices td { border-top: 1px dashed rgb(0 0 0 / 0.15); padding: 0.35rem var(--pad) 0.35rem 0; overflow-wrap: anywhere; }
 .your-devices { margin-top: var(--pad-xlarge); }
 label.owner { max-width: 20rem; }
+/* A system: the hint beside "Switch off" shows on hover; delete sits
+   bottom right. */
+.with-hint .hint { visibility: hidden; opacity: 0; transition: opacity 0.15s; max-width: 26rem; }
+.with-hint button:hover + .hint, .with-hint button:focus-visible + .hint { visibility: visible; opacity: 1; }
+.row.end { justify-content: flex-end; margin-top: var(--pad-xlarge); }
+table.system-cables td { border-top: 1px dashed rgb(0 0 0 / 0.15); padding: 0.35rem var(--pad) 0.35rem 0; vertical-align: middle; }
 details.member { padding: 0.2rem 0; border-top: 1px dashed rgb(0 0 0 / 0.12); }
 details.member ul { margin: 0.2rem 0 var(--pad) 1.2rem !important; font-size: 0.9rem; }
 .save-system ul { list-style: none; margin: var(--pad) 0 !important; }

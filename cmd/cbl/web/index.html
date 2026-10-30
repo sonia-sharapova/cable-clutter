@@ -12,11 +12,10 @@
   <h1><a href="#">CABLE&larr;CLUTTER</a></h1>
   <div class="nav-row">
     <nav>
-      <a href="#route">Find your connection</a>
-      <a href="#explore">Explore</a>
-      <a href="#systems">Your systems</a>
-      <a href="#inventory">Inventory</a>
-      <a href="#wish">Wishlist</a>
+      <a href="#route" data-tab="route">Connect</a>
+      <a href="#explore" data-tab="explore">Explore</a>
+      <a href="#network/systems" data-tab="systems">Systems</a>
+      <a href="#network" data-tab="network">Your Network</a>
     </nav>
     <label class="searchbox">
       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5"/><path d="M10.2 10.2 15 15"/></svg>
@@ -28,6 +27,8 @@
       <p id="timing" class="meta"></p>
     </div>
   </div>
+  <div id="subnav" class="subnav" hidden></div>
+  <ol id="crumbs" class="crumbs" aria-label="You are here"></ol>
 </header>
 
 <main>
