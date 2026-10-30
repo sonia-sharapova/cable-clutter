@@ -6,6 +6,7 @@ package route
 
 import (
 	"container/heap"
+	"maps"
 	"slices"
 	"strings"
 
@@ -67,7 +68,8 @@ func (r *Route) SameSteps(o *Route) bool {
 
 type Options struct {
 	MaxSteps  int
-	OwnedOnly bool // never suggest buying
+	OwnedOnly bool            // never suggest buying
+	Exclude   map[string]bool // item ids already taken (by earlier hops of a plan)
 }
 
 // Connect finds, for each kind of signal (video, audio, data) both devices
@@ -96,7 +98,7 @@ func Connect(c *catalog.Catalog, a, b *catalog.DeviceModel, inv plan.Inventories
 		if len(n.steps) > 0 {
 			if _, done := best[kind]; !done {
 				for _, t := range b.Ports {
-					if t.Receives(n.signal) && meets(c, n.open, t.End) {
+					if t.Receives(n.signal) && c.Meets(n.open, t.End) {
 						best[kind] = &Route{Signal: n.signal, From: n.from, To: t, Steps: n.steps, Cost: n.cost}
 						break
 					}
@@ -109,17 +111,17 @@ func Connect(c *catalog.Catalog, a, b *catalog.DeviceModel, inv plan.Inventories
 		}
 		settled[key] = true
 
-		for _, conn := range mates(c, n.open.Connector) {
+		for _, conn := range c.MatesOf(n.open.Connector) {
 			for _, part := range c.ByConnector[conn] {
 				for i, in := range part.Ends {
-					if in.Connector != conn || !meets(c, n.open, in) {
+					if in.Connector != conn || !c.Meets(n.open, in) {
 						continue
 					}
 					outSignals := passes(c, part, in, n.signal)
 					if len(outSignals) == 0 {
 						continue
 					}
-					item, busy, cost := pick(c, part, n.steps, inv)
+					item, busy, cost := pick(c, part, n.steps, inv, opt.Exclude)
 					if item == nil && opt.OwnedOnly {
 						continue
 					}
@@ -164,28 +166,6 @@ func passes(c *catalog.Catalog, part *catalog.Part, in catalog.End, signal strin
 	return []string{signal}
 }
 
-// meets reports whether two ends plug together: mating connectors, opposite
-// genders, and the plug side has no more plugs than the socket side takes
-// (red/white RCA into a yellow/white/red input).
-func meets(c *catalog.Catalog, a, b catalog.End) bool {
-	if a.Gender == b.Gender || !slices.Contains(mates(c, a.Connector), b.Connector) {
-		return false
-	}
-	male, female := a, b
-	if a.Gender == "f" {
-		male, female = b, a
-	}
-	return male.Count <= female.Count
-}
-
-func mates(c *catalog.Catalog, conn string) []string {
-	out := []string{conn}
-	if cn, ok := c.Connectors[conn]; ok {
-		out = append(out, cn.Mates...)
-	}
-	return out
-}
-
 // connectorSignals is which signals each connector can carry, learned from
 // every two-ended cable and device port in the catalog. It stops a hub's
 // USB-A socket being offered as an HDMI output.
@@ -215,11 +195,14 @@ func connectorSignals(c *catalog.Catalog) map[string]map[string]bool {
 }
 
 // pick chooses which owned item a step would use, given the items earlier
-// steps of the same route already use: a free one, else one in use, else
-// none (buy).
-func pick(c *catalog.Catalog, part *catalog.Part, earlier []Step, inv plan.Inventories) (*library.Item, string, int) {
+// steps of the same route already use and those excluded: a free one, else
+// one in use, else none (buy).
+func pick(c *catalog.Catalog, part *catalog.Part, earlier []Step, inv plan.Inventories, exclude map[string]bool) (*library.Item, string, int) {
 	in := inv.Of(c, part.Key)
-	used := map[string]bool{}
+	used := maps.Clone(exclude)
+	if used == nil {
+		used = map[string]bool{}
+	}
 	for _, s := range earlier {
 		if s.Item != nil {
 			used[s.Item.ID] = true

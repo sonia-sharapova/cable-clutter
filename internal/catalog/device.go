@@ -166,5 +166,28 @@ func (c *Catalog) Fits(p Port) []Fit {
 	return out
 }
 
+// Meets reports whether two ends plug together: mating connectors, opposite
+// genders, and the plug side has no more plugs than the socket side takes
+// (red/white RCA into a yellow/white/red input).
+func (c *Catalog) Meets(a, b End) bool {
+	if a.Gender == b.Gender || !slices.Contains(c.MatesOf(a.Connector), b.Connector) {
+		return false
+	}
+	male, female := a, b
+	if a.Gender == "f" {
+		male, female = b, a
+	}
+	return male.Count <= female.Count
+}
+
+// MatesOf is the connector itself plus the connectors it plugs into.
+func (c *Catalog) MatesOf(conn string) []string {
+	out := []string{conn}
+	if cn, ok := c.Connectors[conn]; ok {
+		out = append(out, cn.Mates...)
+	}
+	return out
+}
+
 // DeviceModels returns every model in catalog order.
 func (c *Catalog) DeviceModels() []*DeviceModel { return c.deviceOrder }

@@ -310,6 +310,7 @@ func TestJSON(t *testing.T) {
 		{"find", "aux"}, {"show", "grey"}, {"show", "usb-a", "usb-c"}, {"catalog", "devices"}, {"doctor"},
 		{"adapter", "ls"}, {"device", "ls"}, {"system", "ls"}, {"system", "show", "Desk"}, {"wish"},
 		{"wish", "add", "aux", "rca"}, {"wish", "done", "1"}, {"system", "down", "Desk"},
+		{"reach", "Mac"}, {"plan", "Mac", "ATV"}, {"best-buy"}, {"spare"}, {"graph"},
 	} {
 		decode(args...)
 	}
@@ -344,4 +345,43 @@ func TestExportImport(t *testing.T) {
 		t.Error("imported over a non-empty library")
 	}
 	mustRun(t, "import", file, "--replace")
+}
+
+func TestSmartCommands(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "ps2", "--name", "PS2")
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	mustRun(t, "device", "add", "ipod-2nd-gen", "--name", "iPod")
+	mustRun(t, "add", "ps2-avmulti", "rca*3")
+	mustRun(t, "adapter", "add", "sata", "esata")
+
+	if out := mustRun(t, "reach", "ps2"); !strings.Contains(out, "CRT") || !strings.Contains(out, "PlayStation AV cable") || !strings.Contains(out, "iPod") {
+		t.Errorf("reach:\n%s", out)
+	}
+	out := mustRun(t, "plan", "ps2", "crt", "--save", "Retro corner")
+	if !strings.Contains(out, "Hop 1: PS2 → CRT") || !strings.Contains(out, `Saved as system "Retro corner"`) {
+		t.Errorf("plan:\n%s", out)
+	}
+	if out := mustRun(t, "system", "up", "Retro corner"); !strings.Contains(out, "PlayStation AV cable") {
+		t.Errorf("saved plan doesn't come up:\n%s", out)
+	}
+	if out := mustRun(t, "system", "show", "Retro corner"); !strings.Contains(out, "PS2 · AV Multi Out → CRT · AV in") {
+		t.Errorf("saved plan links:\n%s", out)
+	}
+	if out := mustRun(t, "best-buy"); !strings.Contains(out, "USB-A to Apple 30-pin") {
+		t.Errorf("best-buy:\n%s", out)
+	}
+	if out := mustRun(t, "spare"); !strings.Contains(out, "SATA to eSATA adapter") {
+		t.Errorf("spare:\n%s", out)
+	}
+	for _, f := range []string{"text", "mermaid", "dot"} {
+		mustRun(t, "graph", "--format", f)
+	}
+	if out := mustRun(t, "graph"); !strings.Contains(out, "Nothing you own plugs into: iPod") {
+		t.Errorf("graph:\n%s", out)
+	}
+	mustRun(t, "graph", "--device", "PS2", "--format", "mermaid")
+	if _, err := run(t, "graph", "--format", "png"); err == nil {
+		t.Error("unknown format accepted")
+	}
 }

@@ -68,6 +68,14 @@ cbl connect "mac mini" "crt tv" --wish          # add the missing parts to the w
 cbl connect pi crt --owned --max 2              # only what you own; shorter chains
 cbl wish / wish add / wish done 1 / wish rm 1   # done = bought: it joins your inventory
 
+cbl reach PS2                                   # everything it connects to, with what you own
+cbl plan PS2 "CRT TV" "TE speaker"              # wire a chain; no cable gets two jobs
+cbl plan PS2 "CRT TV" --save "Retro corner"     # ...and save it as a system
+cbl best-buy                                    # purchases ranked by new connections
+cbl spare                                       # what fits none of your devices; what's
+                                                #   worth a second of
+cbl graph [--format text|mermaid|dot] [--device PS2]
+
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals
@@ -92,6 +100,8 @@ cbl import backup.json    # into an empty library (--replace to overwrite)
 | `internal/plan` | Which item each link uses when a system comes up (pinned, then dedicated, then any spare), and which systems conflict over cables or device ports. |
 | `internal/route` | Dijkstra over (open connector, signal) states: one signal must survive the chain; converters (`in_signals`) change it; one-way parts (`source`) and send-only ports (`out_only`) are respected. |
 | `internal/perf` | Performance budgets as tests, on a 5,000-type catalog and a 500-cable library. |
+| `internal/smart` | Questions across all your gear: reach, chains (`plan`), best buys, unused parts and spares. |
+| `internal/graph` | The gear graph (devices, connectors, owned parts) as text, Mermaid or Graphviz. |
 | `internal/library` | The user's own data in SQLite (WAL), with numbered migrations. |
 | `cmd/cbl` | The CLI. |
 
