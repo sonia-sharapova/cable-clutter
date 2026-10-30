@@ -115,20 +115,22 @@ function lookup(q) {
 
 // --- search view -----------------------------------------------------------
 
+// search fills the dropdown under the header's search box. It's on every
+// page; picking a result opens that thing's page.
 function search() {
   const q = $("#q").value;
   const t0 = performance.now();
   const hits = lookup(q);
   const ms = performance.now() - t0;
   selected = 0;
-  $("#timing").textContent = q
-    ? `${hits.length} result${hits.length === 1 ? "" : "s"} in ${ms.toFixed(3)} ms · 1 hashmap lookup of ${index.keys.toLocaleString()} prefixes`
-    : `${index.entries.length} things indexed as ${index.keys.toLocaleString()} prefixes in ${index.ms.toFixed(1)} ms`;
+  $("#dropdown").hidden = !q.trim();
+  $("#timing").textContent = `${hits.length} result${hits.length === 1 ? "" : "s"} in ${ms.toFixed(3)} ms · 1 hashmap lookup of ${index.keys.toLocaleString()} prefixes`;
   const list = $("#results");
   fill(list,
     ...hits.slice(0, 60).map((i, n) => {
       const e = index.entries[i];
-      return el("li", { "aria-selected": n === 0 ? "true" : "false", onclick: () => openEntry(e.id) },
+      // mousedown, not click: it fires before the box loses focus and closes.
+      return el("li", { "aria-selected": n === 0 ? "true" : "false", onmousedown: (ev) => { ev.preventDefault(); openEntry(e.id); } },
         el("span", { class: "kind" }, KIND_LABEL[e.kind]),
         el("span", { class: "title" }, e.title), " ",
         e.status ? statusTag(e.status) : null,
@@ -136,6 +138,12 @@ function search() {
     }),
   );
   if (hits.length > 60) list.append(el("li", { class: "meta" }, `… and ${hits.length - 60} more; keep typing`));
+  if (!hits.length) list.append(el("li", { class: "meta" }, "Nothing called that."));
+}
+
+function closeSearch() {
+  $("#q").value = "";
+  $("#dropdown").hidden = true;
 }
 
 function move(by) {
@@ -151,30 +159,26 @@ function move(by) {
 // open shows an entry: "part:usb-a:m|usb-c:m" → #part/usb-a%3Am%7Cusb-c%3Am
 function openEntry(id) {
   const i = id.indexOf(":");
+  closeSearch();
+  $("#q").blur();
   location.hash = "#" + id.slice(0, i) + "/" + encodeURIComponent(id.slice(i + 1));
 }
 
 async function route() {
   const hash = decodeURIComponent(location.hash.slice(1));
-  const [kind, ...rest] = hash.split("/");
+  const [kind = "inventory", ...rest] = (hash || "inventory").split("/"); // the site opens on Inventory
   const arg = rest.join("/");
   for (const a of document.querySelectorAll("nav a")) {
-    a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + (["inventory", "connect", "systems", "wish"].includes(kind) ? kind : ""));
+    a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + kind);
   }
   const view = $("#view");
-  $("#search").hidden = kind !== "";
-  view.hidden = kind === "";
-  if (kind === "") {
-    $("#q").focus();
-    return;
-  }
   const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, inventory: showInventory, connect: showConnect, systems: showSystems, wish: showWish }[kind];
   if (!render) return;
   fill(view, el("p", { class: "meta" }, "…"));
   try {
-    fill(view, el("a", { href: "#", class: "back meta" }, "← search"), await render(arg));
+    fill(view, await render(arg));
   } catch (err) {
-    fill(view, el("a", { href: "#", class: "back meta" }, "← search"), el("p", { class: "warn" }, err.message));
+    fill(view, el("p", { class: "warn" }, err.message));
   }
 }
 
@@ -647,13 +651,13 @@ async function refresh() {
 
 document.addEventListener("keydown", (e) => {
   const typing = document.activeElement === $("#q");
-  if (e.key === "/" && !typing && !(document.activeElement instanceof HTMLSelectElement)) {
+  const inField = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName);
+  if (e.key === "/" && !inField) {
     e.preventDefault();
-    location.hash = "";
     $("#q").focus();
-  } else if (e.key === "Escape") {
-    if (location.hash) location.hash = "";
-    else { $("#q").value = ""; search(); }
+  } else if (typing && e.key === "Escape") {
+    closeSearch();
+    $("#q").blur();
   } else if (typing && e.key === "ArrowDown") { e.preventDefault(); move(1); }
   else if (typing && e.key === "ArrowUp") { e.preventDefault(); move(-1); }
   else if (typing && e.key === "Enter") {
@@ -662,6 +666,8 @@ document.addEventListener("keydown", (e) => {
   }
 });
 $("#q").addEventListener("input", search);
+$("#q").addEventListener("focus", search);
+$("#q").addEventListener("blur", () => { $("#dropdown").hidden = true; });
 window.addEventListener("hashchange", route);
 
 refresh().then(route);

@@ -10,8 +10,15 @@
 <body>
 <header class="site-header">
   <h1><a href="#">CABLE&larr;CLUTTER</a></h1>
+  <div class="omnibox">
+    <input id="q" type="search" autocomplete="off" spellcheck="false" aria-label="Search everything"
+      placeholder="search cables, plugs, devices, setups&hellip;  /">
+    <div id="dropdown" hidden>
+      <ol id="results"></ol>
+      <p id="timing" class="meta"></p>
+    </div>
+  </div>
   <nav class="meta">
-    <a href="#">Search</a>
     <a href="#inventory">Inventory</a>
     <a href="#connect">Connect</a>
     <a href="#systems">Systems</a>
@@ -20,19 +27,13 @@
 </header>
 
 <main>
-  <section id="search">
-    <label for="q" class="meta">Look up a cable, connector, device or setup</label>
-    <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="aux, usb c, ps2, drawer 2&hellip;">
-    <p id="timing" class="meta">&nbsp;</p>
-    <ol id="results"></ol>
-  </section>
-  <section id="view" hidden></section>
+  <section id="view"></section>
 </main>
 
 <footer class="meta">
   <div id="meter"></div>
   <div id="stats"></div>
-  <p class="keys">/ search &middot; &uarr;&darr; move &middot; enter open &middot; esc back</p>
+  <p class="keys">/ search from any page &middot; &uarr;&darr; move &middot; enter open &middot; esc close</p>
 </footer>
 <script src="app.js"></script>
 </body>

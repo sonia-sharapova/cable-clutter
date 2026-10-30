@@ -32,14 +32,36 @@ a { color: inherit; }
 .meta { font-size: var(--font-small); color: var(--color-sub); }
 
 .site-header, main, footer { max-width: var(--max-content-width); margin: 0 auto; }
-.site-header { margin-bottom: var(--pad-xlarge); }
+.site-header { margin-bottom: var(--pad-large); }
 .site-header h1 { font-size: 1.5rem; font-weight: normal; letter-spacing: 0.02em; }
 .site-header h1 a { text-decoration: none; }
 nav a { margin-right: var(--pad-large); }
 nav a[aria-current] { color: var(--color-primary); text-decoration: none; }
 
 label { display: block; margin-bottom: var(--pad); }
-input[type=search] {
+
+/* The search box on every page, its results dropping down over the page. */
+.omnibox { position: relative; margin: var(--pad-large) 0 var(--pad); }
+#q {
+  width: 100%;
+  font-size: 1rem;
+  padding: 0.35rem 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--color-primary);
+  border-radius: 0;
+  outline: none;
+}
+#dropdown {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 10;
+  max-height: 65vh; overflow-y: auto;
+  background: var(--color-bg); border: 1px solid rgb(0 0 0 / 0.18); border-top: 0;
+  padding: var(--pad) var(--pad-large);
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.08);
+}
+#dropdown #timing { margin: var(--pad) 0 0; }
+
+input[type=search]:not(#q) {
   width: 100%;
   font-size: 1.1rem;
   padding: var(--pad) 0;
@@ -49,7 +71,6 @@ input[type=search] {
   outline: none;
   border-radius: 0;
 }
-#timing { margin: var(--pad) 0 var(--pad-large); }
 
 #results { list-style: none; }
 #results li { padding: var(--pad) var(--pad); margin: 0 calc(-1 * var(--pad)); cursor: pointer; }
