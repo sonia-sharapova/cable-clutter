@@ -33,8 +33,10 @@ a { color: inherit; }
 .meta { font-size: var(--font-small); color: var(--color-sub); }
 
 .site-header, main, footer { max-width: var(--max-content-width); margin: 0 auto; }
-.site-header { margin-bottom: var(--pad-large); }
-.site-header h1 { font-size: 1.5rem; font-weight: normal; letter-spacing: 0.02em; margin: var(--pad-xlarge) 0 var(--pad-large); }
+/* The header breathes: taller lines, and a little room after the title,
+   the tabs and the sub-pages. */
+.site-header { margin-bottom: 1.5rem; line-height: 1.8; }
+.site-header h1 { font-size: 1.5rem; font-weight: normal; letter-spacing: 0.02em; line-height: 1.4; margin: var(--pad-xlarge) 0 1.25rem; }
 .site-header h1 a { text-decoration: none; }
 
 label { display: block; margin-bottom: var(--pad); }
@@ -43,7 +45,7 @@ label { display: block; margin-bottom: var(--pad); }
    results dropping down over the page. One thin rule underlines the row. */
 .nav-row {
   position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--pad) var(--pad-large);
-  margin: var(--pad-large) 0 var(--pad); padding-bottom: 0.35rem; border-bottom: 1px solid var(--color-primary);
+  margin: 0 0 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--color-primary);
 }
 nav { font-size: 0.9rem; color: var(--color-sub); }
 nav a { margin-right: var(--pad-large); text-decoration: none; transition: color 0.15s; }
@@ -76,7 +78,7 @@ a.abbr:hover::after, a.abbr:focus-visible::after {
   padding: 0.2rem 0.45rem; pointer-events: none;
 }
 /* Sub-pages of a section, then the path to this page. */
-.subnav { display: flex; flex-wrap: wrap; gap: var(--pad) var(--pad-large); margin: 0 0 var(--pad); font-family: var(--monospace); font-size: 0.8rem; }
+.subnav { display: flex; flex-wrap: wrap; gap: 0 var(--pad-large); margin: 0 0 0.5rem; font-family: var(--monospace); font-size: 0.8rem; }
 .subnav a { color: var(--color-sub); text-decoration: none; }
 .subnav a:hover { color: var(--color-hover); }
 .subnav a.here { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
