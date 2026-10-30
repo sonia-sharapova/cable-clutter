@@ -228,17 +228,24 @@ async function showInventory() {
   const categories = [...new Set(rows.flatMap((r) => r.categories))].sort();
   const connectors = new Map();
   for (const r of rows) for (const c of r.connectors) connectors.set(c.id, { name: c.name, n: (connectors.get(c.id)?.n || 0) + r.items.length });
-  const panel = el("div", { class: "filter-panel", hidden: !invFilter.open },
+  const panel = el("div", { class: "filter-panel" },
     el("label", {}, "kind", select("kind", [["all", "all"], ["cables", "cables"], ["adapters", "adapters"]])),
     el("label", {}, "carries", select("category", [["all", "anything"], ...categories.map((c) => [c, c])])),
     el("label", {}, "connector", select("connector", [["", "any connector"],
       ...[...connectors].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([id, c]) => [id, `${c.name} (${c.n})`])])),
     el("label", {}, "status", select("status", [["all", "any"], ["available", "available"], ["in use", "in use"], ["reserved", "reserved"]])),
     el("button", { class: "quiet", onclick: () => { Object.assign(invFilter, { kind: "all", category: "all", connector: "", status: "all" }); route(); } }, "clear filters"));
-  const filterButton = el("button", { onclick: () => { invFilter.open = !invFilter.open; panel.hidden = !invFilter.open; filterLabel(); } });
+  // Hovering the trigger opens the panel; a click pins it open (for touch
+  // screens and keyboards).
+  const bar = el("div", { class: "filter-bar" + (invFilter.open ? " open" : "") });
+  const filterButton = el("button", { class: "trigger", "aria-expanded": String(invFilter.open), onclick: () => {
+    invFilter.open = !invFilter.open;
+    bar.classList.toggle("open", invFilter.open);
+    filterButton.setAttribute("aria-expanded", String(invFilter.open));
+  } });
   const filterLabel = () => {
     const n = ["kind", "category", "status"].filter((k) => invFilter[k] !== "all").length + (invFilter.connector ? 1 : 0);
-    fill(filterButton, `Filter${n ? ` (${n})` : ""} ${invFilter.open ? "▴" : "▾"}`);
+    fill(filterButton, `Filter${n ? ` (${n})` : ""}`);
   };
   const searchBox = el("input", { type: "search", class: "inline", placeholder: "search your inventory", value: invFilter.query,
     oninput: (e) => { invFilter.query = e.target.value; draw(); } });
@@ -277,8 +284,7 @@ async function showInventory() {
   return [
     el("h2", {}, "Inventory"),
     el("p", { class: "meta" }, `${total} items of ${rows.length} types.`),
-    el("div", { class: "toolbar" }, filterButton, searchBox),
-    panel,
+    fill(bar, filterButton, searchBox, panel),
     list,
   ];
 }
