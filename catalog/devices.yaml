@@ -4,13 +4,15 @@
 # identical ports there are. Power ports carry `volts` so a wrong-voltage
 # adaptor is never suggested. `confirmed: false` marks port lists that rest
 # on an assumption about the exact model; `assumption` says which.
+# `out_only` lists signals that only leave a two-way port (a laptop's USB-C
+# port sends video but doesn't take it in).
 devices:
   - id: mac-mini-m2-2023
     name: "Mac mini (M2, 2023)"
     aliases: [mac mini, mac mini m2]
     confirmed: true
     ports:
-      - {label: Thunderbolt 4, end: "usb-c:f", qty: 2, dir: both, signals: [usb4, usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb]}
+      - {label: Thunderbolt 4, end: "usb-c:f", qty: 2, dir: both, signals: [usb4, usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], out_only: [video.displayport, video.hdmi]}
       - {label: USB-A, end: "usb-a:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, power.usb]}
       - {label: HDMI, end: "hdmi:f", dir: out, signals: [video.hdmi]}
       - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
@@ -22,7 +24,7 @@ devices:
     aliases: [macbook pro, macbook pro m1, mbp]
     confirmed: true
     ports:
-      - {label: Thunderbolt / USB 4, end: "usb-c:f", qty: 2, dir: both, signals: [usb4, usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], note: "Also charges the laptop"}
+      - {label: Thunderbolt / USB 4, end: "usb-c:f", qty: 2, dir: both, signals: [usb4, usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], out_only: [video.displayport, video.hdmi], note: "Also charges the laptop"}
       - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
 
   - id: thinkpad-t14-t15-gen1
@@ -31,7 +33,7 @@ devices:
     confirmed: false
     assumption: "Gen 1 Intel ports; later generations differ slightly"
     ports:
-      - {label: USB-C, end: "usb-c:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], note: "One is Thunderbolt 3 on Intel models; both charge"}
+      - {label: USB-C, end: "usb-c:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, video.displayport, video.hdmi, power.usb], out_only: [video.displayport, video.hdmi], note: "One is Thunderbolt 3 on Intel models; both charge"}
       - {label: USB-A, end: "usb-a:f", qty: 2, dir: both, signals: [usb.3.0, usb.2.0, power.usb]}
       - {label: HDMI, end: "hdmi:f", dir: out, signals: [video.hdmi]}
       - {label: Ethernet, end: "rj45:f", dir: both, signals: [net.ethernet]}
@@ -55,7 +57,7 @@ devices:
     aliases: [iphone, iphone 5]
     confirmed: true
     ports:
-      - {label: Lightning, end: "lightning:f", dir: both, signals: [lightning.data, power.usb, video.hdmi], note: "HDMI out needs the Lightning Digital AV adapter"}
+      - {label: Lightning, end: "lightning:f", dir: both, signals: [usb.2.0, power.usb, video.hdmi], out_only: [video.hdmi], note: "HDMI out needs the Lightning Digital AV adapter"}
       - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
 
   - id: ipod-2nd-gen
@@ -64,7 +66,7 @@ devices:
     confirmed: false
     assumption: "a 30-pin model (nano, touch or classic); the iPod shuffle uses a 3.5 mm dock instead"
     ports:
-      - {label: Dock, end: "apple-30pin:f", dir: both, signals: [apple30.data, power.usb]}
+      - {label: Dock, end: "apple-30pin:f", dir: both, signals: [usb.2.0, power.usb]}
       - {label: Headphone, end: "trs-3.5:f", dir: out, signals: [audio.analog.stereo]}
 
   - id: nintendo-3ds
@@ -154,4 +156,4 @@ devices:
     assumption: "the OB-4; other Teenage Engineering speakers differ"
     ports:
       - {label: Line in, end: "trs-3.5:f", dir: in, signals: [audio.analog.stereo]}
-      - {label: USB-C, end: "usb-c:f", dir: in, signals: [power.usb, usb.2.0], note: "Charging"}
+      - {label: USB-C, end: "usb-c:f", dir: in, signals: [power.usb], note: "Charging only"}

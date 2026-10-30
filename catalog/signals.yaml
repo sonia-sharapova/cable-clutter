@@ -4,8 +4,6 @@ signals:
   - {id: usb.2.0, kind: data, name: "USB 2.0 data (480 Mb/s)"}
   - {id: usb.3.0, kind: data, name: "USB 3.0 / 3.2 Gen 1 data (5 Gb/s)"}
   - {id: usb4, kind: data, name: "USB4 / Thunderbolt 3-4 (40 Gb/s)"}
-  - {id: lightning.data, kind: data, name: "Lightning data (USB 2.0 speed)"}
-  - {id: apple30.data, kind: data, name: "Apple 30-pin dock data"}
   - {id: video.hdmi, kind: video, name: "HDMI digital video + audio"}
   - {id: video.dvi, kind: video, name: "DVI digital video (no audio)"}
   - {id: video.displayport, kind: video, name: "DisplayPort video + audio"}

@@ -1,6 +1,7 @@
 # Adapters: rigid parts with no cable between the ends (plug converters,
 # couplers, hubs, chargers). Same end syntax as cables.yaml; kept in their
-# own inventory.
+# own inventory. A converter that changes the signal lists what it accepts at
+# its source end in `in_signals`; what comes out is its `signals`.
 adapters:
   # Power
   - {ends: [nema-1-15:f, cee-7-16:m], signals: [power.ac], name: "US to EU plug adapter", aliases: [travel adapter], note: "Changes plug shape only, not voltage"}
@@ -9,14 +10,14 @@ adapters:
   - {ends: [nema-1-15:m, usb-a:f], signals: [power.usb], name: "USB-A wall charger", aliases: [usb charger, usb brick]}
 
   # Hubs and dongles
-  - {ends: [lightning:m, hdmi:f, lightning:f], signals: [video.hdmi, power.usb], active: true, name: "Lightning Digital AV adapter", note: "HDMI out from iPhone/iPad, with charging pass-through"}
-  - {ends: [usb-c:m, usb-a:f, hdmi:f, usb-c:f], signals: [usb.3.0, video.hdmi, power.usb], active: true, name: "USB-C multiport adapter (USB-A, HDMI, USB-C)"}
-  - {ends: [usb-c:m, hdmi:f, usb-a:f, usb-a-3.0:f, sd:f, microsd:f, usb-c:f], signals: [usb.3.0, video.hdmi, storage.card, power.usb], active: true, name: "USB-C hub with card reader (HDMI, USB, SD, microSD, USB-C)"}
+  - {ends: [lightning:m, hdmi:f, lightning:f], signals: [video.hdmi, power.usb], active: true, source: lightning, name: "Lightning Digital AV adapter", note: "HDMI out from iPhone/iPad, with charging pass-through"}
+  - {ends: [usb-c:m, usb-a:f, hdmi:f, usb-c:f], signals: [usb.3.0, video.hdmi, power.usb], active: true, source: usb-c, name: "USB-C multiport adapter (USB-A, HDMI, USB-C)"}
+  - {ends: [usb-c:m, hdmi:f, usb-a:f, usb-a-3.0:f, sd:f, microsd:f, usb-c:f], signals: [usb.3.0, video.hdmi, storage.card, power.usb], active: true, source: usb-c, name: "USB-C hub with card reader (HDMI, USB, SD, microSD, USB-C)"}
   - {ends: [usb-a:f, usb-c:m], signals: [usb.3.0, power.usb], name: "USB-C to USB-A adapter (OTG)", aliases: [otg]}
   - {ends: [usb-c:f, usb-a:m], signals: [usb.2.0, power.usb], name: "USB-A to USB-C adapter"}
-  - {ends: [usb-c:m, trs-3.5:f], signals: [audio.analog.stereo], active: true, name: "USB-C to 3.5 mm headphone adapter", aliases: [usb c dongle]}
-  - {ends: [lightning:m, trs-3.5:f], signals: [audio.analog.stereo], active: true, name: "Lightning to 3.5 mm headphone adapter"}
-  - {ends: [hdmi:f, "rca*3:f"], signals: [video.composite, audio.analog.stereo], active: true, name: "HDMI to composite (AV) converter", aliases: [hdmi to av, hdmi to rca], note: "Needs USB power; lets modern sources drive a CRT"}
+  - {ends: [usb-c:m, trs-3.5:f], signals: [audio.analog.stereo], active: true, source: usb-c, in_signals: [usb.2.0], name: "USB-C to 3.5 mm headphone adapter", aliases: [usb c dongle]}
+  - {ends: [lightning:m, trs-3.5:f], signals: [audio.analog.stereo], active: true, source: lightning, in_signals: [usb.2.0], name: "Lightning to 3.5 mm headphone adapter"}
+  - {ends: [hdmi:f, "rca*3:f"], signals: [video.composite, audio.analog.stereo], active: true, source: hdmi, in_signals: [video.hdmi], name: "HDMI to composite (AV) converter", aliases: [hdmi to av, hdmi to rca], note: "Needs USB power; lets modern sources drive a CRT"}
 
   # Storage
   - {ends: [sata:f, esata:f], signals: [storage.sata], name: "SATA to eSATA adapter (DVD / drive)"}

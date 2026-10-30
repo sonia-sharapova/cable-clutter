@@ -5,7 +5,7 @@ package catalogdata
 import "embed"
 
 // Version identifies this catalog release. Bump it whenever a YAML file changes.
-const Version = "2026.10.2"
+const Version = "2026.10.4"
 
 //go:embed *.yaml
 var FS embed.FS

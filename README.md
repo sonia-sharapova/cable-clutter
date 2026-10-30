@@ -46,6 +46,13 @@ cbl system up Lounge --wish                     # or add what's missing to the w
 cbl system down "Retro corner"                  # disconnect: cables come back
 cbl system ls / show / unlink / rm              # ls flags systems that can't be up together
 
+cbl connect ps2 "crt tv"                        # cheapest chain for video, audio, data:
+                                                #   free items first, then busy ones,
+                                                #   then what to buy
+cbl connect "mac mini" "crt tv" --wish          # add the missing parts to the wishlist
+cbl connect pi crt --owned --max 2              # only what you own; shorter chains
+cbl wish / wish add / wish done 1 / wish rm 1   # done = bought: it joins your inventory
+
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals
@@ -64,6 +71,7 @@ cbl find aux --timing     # print load and query times
 | `catalog/devices.yaml` | Device models and their ports (connector, direction, signals, voltage). `confirmed: false` marks port lists resting on an assumption. |
 | `internal/advise` | Per-port report: what you own that fits, what it lets you do, what to buy for the rest, and power supplies of the wrong voltage. |
 | `internal/plan` | Which item each link uses when a system comes up (pinned, then dedicated, then any spare), and which systems conflict over cables or device ports. |
+| `internal/route` | Dijkstra over (open connector, signal) states: one signal must survive the chain; converters (`in_signals`) change it; one-way parts (`source`) and send-only ports (`out_only`) are respected. |
 | `internal/library` | The user's own data in SQLite (WAL), with numbered migrations. |
 | `cmd/cbl` | The CLI. |
 

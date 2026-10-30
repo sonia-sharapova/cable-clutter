@@ -76,8 +76,14 @@ func (db *DB) AddItems(it Item, qty int) ([]*Item, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
+	out, err := addItems(tx, it, qty, now())
+	if err != nil {
+		return nil, err
+	}
+	return out, tx.Commit()
+}
 
-	at := now()
+func addItems(tx *sql.Tx, it Item, qty int, at int64) ([]*Item, error) {
 	var deviceID sql.NullString
 	if it.Dedicated != "" {
 		id, err := ensureDevice(tx, it.Dedicated, at)
@@ -106,7 +112,7 @@ func (db *DB) AddItems(it Item, qty int) ([]*Item, error) {
 		}
 		out = append(out, &n)
 	}
-	return out, tx.Commit()
+	return out, nil
 }
 
 // ensureDevice returns the id of the live device with this nickname

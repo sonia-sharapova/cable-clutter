@@ -41,11 +41,15 @@ type Part struct {
 	Ends    []End
 	Variant string
 	Signals []string
-	Active  bool // contains electronics (converter, DAC, hub)
-	Volts   float64
-	Amps    float64
-	Aliases []string
-	Note    string
+	Active  bool   // contains electronics (converter, DAC, hub)
+	Source  string // for one-way converters: the connector audio/video enters by
+	// InSignals, for converters that change the signal: what they accept at
+	// Source. What comes out is Signals.
+	InSignals []string
+	Volts     float64
+	Amps      float64
+	Aliases   []string
+	Note      string
 }
 
 // Catalog is the read-only catalog plus its indexes. Every map lookup is O(1);
@@ -68,15 +72,17 @@ type Catalog struct {
 }
 
 type rawPart struct {
-	Ends    []string
-	Variant string
-	Signals []string
-	Active  bool
-	Volts   float64
-	Amps    float64
-	Name    string
-	Aliases []string
-	Note    string
+	Ends      []string
+	Variant   string
+	Signals   []string
+	Active    bool
+	Source    string
+	InSignals []string `yaml:"in_signals"`
+	Volts     float64
+	Amps      float64
+	Name      string
+	Aliases   []string
+	Note      string
 }
 
 type rawGlyph struct {
@@ -221,7 +227,7 @@ func (c *Catalog) newPart(kind Kind, r rawPart) (*Part, error) {
 	}
 	p := &Part{
 		Kind: kind, Name: r.Name, Variant: r.Variant, Signals: r.Signals,
-		Active: r.Active, Volts: r.Volts, Amps: r.Amps, Aliases: r.Aliases, Note: r.Note,
+		Active: r.Active, Source: r.Source, InSignals: r.InSignals, Volts: r.Volts, Amps: r.Amps, Aliases: r.Aliases, Note: r.Note,
 	}
 	for _, s := range r.Ends {
 		e, err := ParseEnd(s)
@@ -240,6 +246,17 @@ func (c *Catalog) newPart(kind Kind, r rawPart) (*Part, error) {
 		if _, ok := c.Signals[s]; !ok {
 			return nil, fmt.Errorf("%s %q: unknown signal %q", kind, r.Name, s)
 		}
+	}
+	for _, s := range p.InSignals {
+		if _, ok := c.Signals[s]; !ok {
+			return nil, fmt.Errorf("%s %q: unknown in_signal %q", kind, r.Name, s)
+		}
+	}
+	if len(p.InSignals) > 0 && p.Source == "" {
+		return nil, fmt.Errorf("%s %q: in_signals needs a source end", kind, r.Name)
+	}
+	if p.Source != "" && !slices.ContainsFunc(p.Ends, func(e End) bool { return e.Connector == p.Source }) {
+		return nil, fmt.Errorf("%s %q: source %q is not one of its ends", kind, r.Name, p.Source)
 	}
 	p.Key = Key(p.Ends, p.Variant)
 	return p, nil

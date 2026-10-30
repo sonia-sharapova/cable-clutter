@@ -1,6 +1,8 @@
 # Cable types. An end is "connector[*count]:gender", e.g. "rca*3:m" is three
 # male RCA plugs. The canonical key is built from the sorted ends plus the
-# optional variant, so end order never matters.
+# optional variant, so end order never matters. `source` names the end that
+# audio and video must come in through, for converters that only work one
+# way (a USB-C to HDMI cable takes video from USB-C to HDMI, never back).
 cables:
   # USB
   - {ends: [usb-a:m, usb-c:m], signals: [usb.2.0, power.usb], name: "USB-A to USB-C"}
@@ -16,22 +18,22 @@ cables:
   - {ends: [usb-a-3.0:m, usb-b:m], signals: [usb.2.0], name: "USB-A 3.0 to USB-B", note: "USB-B end limits it to USB 2.0 speed"}
   - {ends: [usb-a-3.0:m, usb-b-3.0:m], signals: [usb.3.0], name: "USB 3.0 A to B"}
   - {ends: [usb-a:m, usb-a:f], signals: [usb.2.0, power.usb], name: "USB-A extension"}
-  - {ends: [usb-a:m, lightning:m], signals: [lightning.data, power.usb], name: "USB-A to Lightning"}
-  - {ends: [usb-a-3.0:m, lightning:m], signals: [lightning.data, power.usb], name: "USB-A 3.0 to Lightning", note: "Lightning is USB 2.0 speed whatever the plug"}
-  - {ends: [usb-c:m, lightning:m], signals: [lightning.data, power.usb], name: "USB-C to Lightning"}
-  - {ends: [usb-a:m, apple-30pin:m], signals: [apple30.data, power.usb], name: "USB-A to Apple 30-pin"}
+  - {ends: [usb-a:m, lightning:m], signals: [usb.2.0, power.usb], name: "USB-A to Lightning"}
+  - {ends: [usb-a-3.0:m, lightning:m], signals: [usb.2.0, power.usb], name: "USB-A 3.0 to Lightning", note: "Lightning is USB 2.0 speed whatever the plug"}
+  - {ends: [usb-c:m, lightning:m], signals: [usb.2.0, power.usb], name: "USB-C to Lightning"}
+  - {ends: [usb-a:m, apple-30pin:m], signals: [usb.2.0, power.usb], name: "USB-A to Apple 30-pin"}
 
   # Video
   - {ends: [hdmi:m, hdmi:m], signals: [video.hdmi], name: "HDMI cable"}
   - {ends: [hdmi:m, mini-hdmi:m], signals: [video.hdmi], name: "HDMI to Mini-HDMI"}
   - {ends: [hdmi:m, micro-hdmi:m], signals: [video.hdmi], name: "HDMI to Micro-HDMI"}
-  - {ends: [hdmi:m, usb-c:m], signals: [video.hdmi], active: true, name: "USB-C to HDMI", note: "USB-C end must support DisplayPort Alt Mode"}
+  - {ends: [hdmi:m, usb-c:m], signals: [video.hdmi], active: true, source: usb-c, name: "USB-C to HDMI", note: "USB-C end must support DisplayPort Alt Mode"}
   - {ends: [hdmi:m, mini-dvi:m], signals: [video.dvi], name: "HDMI to Mini-DVI", note: "Video only, no audio"}
   - {ends: [hdmi:m, dvi:m], signals: [video.dvi], name: "HDMI to DVI", note: "Video only, no audio"}
   - {ends: [displayport:m, displayport:m], signals: [video.displayport], name: "DisplayPort cable"}
-  - {ends: [displayport:m, hdmi:m], signals: [video.hdmi], name: "DisplayPort to HDMI", note: "DisplayPort end to HDMI screen; the source port must support dual-mode (DP++)"}
-  - {ends: [mini-displayport:m, hdmi:m], signals: [video.hdmi], name: "Mini DisplayPort to HDMI"}
-  - {ends: [usb-c:m, displayport:m], signals: [video.displayport], name: "USB-C to DisplayPort", note: "USB-C end must support DisplayPort Alt Mode"}
+  - {ends: [displayport:m, hdmi:m], signals: [video.hdmi], source: displayport, name: "DisplayPort to HDMI", note: "DisplayPort end to HDMI screen; the source port must support dual-mode (DP++)"}
+  - {ends: [mini-displayport:m, hdmi:m], signals: [video.hdmi], source: mini-displayport, name: "Mini DisplayPort to HDMI"}
+  - {ends: [usb-c:m, displayport:m], signals: [video.displayport], source: usb-c, name: "USB-C to DisplayPort", note: "USB-C end must support DisplayPort Alt Mode"}
   - {ends: [vga:m, vga:m], signals: [video.vga], name: "VGA cable"}
 
   # Analog AV

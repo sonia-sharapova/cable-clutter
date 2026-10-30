@@ -211,3 +211,44 @@ func TestSystems(t *testing.T) {
 	mustRun(t, "system", "unlink", "Lounge", "1")
 	mustRun(t, "system", "rm", "Lounge")
 }
+
+func TestConnectAndWish(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "device", "add", "raspberry-pi-3b", "--name", "Pi")
+	mustRun(t, "device", "add", "crt-tv", "--name", "CRT")
+	mustRun(t, "add", "aux", "rca")
+
+	out := mustRun(t, "connect", "pi", "crt")
+	for _, want := range []string{"Pi → CRT", "VIDEO", "★ NEED: 3.5 mm TRRS to RCA AV cable", "AUDIO", "→ 3.5 mm to RCA stereo breakout", "free", "--wish"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("connect missing %q:\n%s", want, out)
+		}
+	}
+	mustRun(t, "connect", "pi", "crt", "--wish")
+	out = mustRun(t, "connect", "pi", "crt", "--wish")
+	if !strings.Contains(out, "Already on your wishlist") {
+		t.Errorf("wish added twice:\n%s", out)
+	}
+	if out := mustRun(t, "wish"); !strings.Contains(out, "3.5 mm TRRS to RCA AV cable") || !strings.Contains(out, "Pi → CRT") {
+		t.Errorf("wish list:\n%s", out)
+	}
+	out = mustRun(t, "wish", "done", "1", "--where", "drawer 3")
+	if !strings.Contains(out, "now in your inventory") {
+		t.Errorf("wish done: %s", out)
+	}
+	if out := mustRun(t, "connect", "pi", "crt"); !strings.Contains(out, "Everything needed is in your inventory") {
+		t.Errorf("after buying:\n%s", out)
+	}
+	if out := mustRun(t, "ls", "--type", "trrs"); !strings.Contains(out, "drawer 3") {
+		t.Errorf("bought cable not in inventory:\n%s", out)
+	}
+
+	mustRun(t, "wish", "add", "hdmi", "hdmi", "--qty", "2")
+	mustRun(t, "wish", "rm", "1")
+	if out := mustRun(t, "wish"); !strings.Contains(out, "empty") {
+		t.Errorf("wish rm:\n%s", out)
+	}
+	if _, err := run(t, "connect", "pi", "toaster"); err == nil {
+		t.Error("connect to an unknown device succeeded")
+	}
+}

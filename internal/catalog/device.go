@@ -23,8 +23,17 @@ type Port struct {
 	Qty     int    // identical ports of this kind
 	Dir     string // in, out or both
 	Signals []string
-	Volts   float64 // power inputs only
+	OutOnly []string // signals that only leave a two-way port
+	Volts   float64  // power inputs only
 	Note    string
+}
+
+// Sends reports whether signal s can leave the port.
+func (p Port) Sends(s string) bool { return p.Dir != "in" && slices.Contains(p.Signals, s) }
+
+// Receives reports whether signal s can come into the port.
+func (p Port) Receives(s string) bool {
+	return p.Dir != "out" && slices.Contains(p.Signals, s) && !slices.Contains(p.OutOnly, s)
 }
 
 type rawPort struct {
@@ -33,6 +42,7 @@ type rawPort struct {
 	Qty     int
 	Dir     string
 	Signals []string
+	OutOnly []string `yaml:"out_only"`
 	Volts   float64
 	Note    string
 }
@@ -94,10 +104,15 @@ func (c *Catalog) newPort(r rawPort) (Port, error) {
 			return Port{}, fmt.Errorf("unknown signal %q", s)
 		}
 	}
+	for _, s := range r.OutOnly {
+		if !slices.Contains(r.Signals, s) {
+			return Port{}, fmt.Errorf("out_only signal %q is not one of its signals", s)
+		}
+	}
 	if r.Qty == 0 {
 		r.Qty = 1
 	}
-	return Port{Label: r.Label, End: e, Qty: r.Qty, Dir: r.Dir, Signals: r.Signals, Volts: r.Volts, Note: r.Note}, nil
+	return Port{Label: r.Label, End: e, Qty: r.Qty, Dir: r.Dir, Signals: r.Signals, OutOnly: r.OutOnly, Volts: r.Volts, Note: r.Note}, nil
 }
 
 // Fit is a cable or adapter type that plugs into a port.
