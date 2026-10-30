@@ -145,3 +145,69 @@ func TestDevice(t *testing.T) {
 		t.Error("unknown device accepted")
 	}
 }
+
+func TestSystems(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "add", "hdmi", "hdmi", "--name", "grey hdmi")
+	mustRun(t, "device", "add", "mac-mini-m2-2023", "--name", "Mac mini")
+	mustRun(t, "device", "add", "apple-tv-hd", "--name", "Apple TV")
+	mustRun(t, "system", "new", "Desk")
+	mustRun(t, "system", "new", "Lounge")
+
+	out := mustRun(t, "system", "add-link", "Desk", "grey hdmi", "--from", "Mac mini")
+	if !strings.Contains(out, "Mac mini · HDMI") { // the only port it fits
+		t.Errorf("port not filled in: %s", out)
+	}
+	mustRun(t, "system", "add-link", "Lounge", "hdmi", "hdmi", "--from", "Apple TV:HDMI")
+	if _, err := run(t, "system", "add-link", "Lounge", "hdmi", "hdmi", "--from", "Apple TV:Ethernet"); err == nil {
+		t.Error("HDMI accepted into an Ethernet port")
+	}
+	out = mustRun(t, "system", "ls")
+	if !strings.Contains(out, `not with "Lounge"`) {
+		t.Errorf("conflict not shown:\n%s", out)
+	}
+
+	out = mustRun(t, "system", "up", "Desk")
+	if !strings.Contains(out, "✓ HDMI cable") {
+		t.Errorf("up: %s", out)
+	}
+	if out := mustRun(t, "ls", "--in-use"); !strings.Contains(out, "grey hdmi") {
+		t.Errorf("cable not in use after up:\n%s", out)
+	}
+	if _, err := run(t, "rm", "grey hdmi"); err == nil {
+		t.Error("removed a cable that is in use")
+	}
+
+	// The one HDMI cable is busy: Lounge can't come up...
+	out, err := run(t, "system", "up", "Lounge")
+	if err == nil || !strings.Contains(out, `in use by "Desk"`) || !strings.Contains(out, "--switch") {
+		t.Errorf("conflict not explained; err=%v\n%s", err, out)
+	}
+	// ...unless it switches Desk off, or wishes for another cable.
+	out, err = run(t, "system", "up", "Lounge", "--wish")
+	if err == nil || !strings.Contains(out, "Added 1 × HDMI cable to your wishlist") {
+		t.Errorf("--wish: err=%v\n%s", err, out)
+	}
+	out = mustRun(t, "system", "up", "Lounge", "--switch")
+	if !strings.Contains(out, `Took "Desk" down.`) || !strings.Contains(out, `"Lounge" is up`) {
+		t.Errorf("--switch:\n%s", out)
+	}
+
+	// A second cable lets both be up; Desk's pinned one is busy, so it swaps.
+	mustRun(t, "add", "hdmi", "hdmi")
+	out = mustRun(t, "system", "up", "Desk")
+	if !strings.Contains(out, `busy in "Lounge"`) {
+		t.Errorf("swap not reported:\n%s", out)
+	}
+	mustRun(t, "system", "down", "Lounge")
+	mustRun(t, "system", "down", "Desk")
+	if out := mustRun(t, "ls", "--in-use"); !strings.Contains(out, "No cables match") {
+		t.Errorf("cables still in use after down:\n%s", out)
+	}
+	out = mustRun(t, "system", "show", "Desk")
+	if !strings.Contains(out, "would use") || !strings.Contains(out, "pinned") {
+		t.Errorf("show:\n%s", out)
+	}
+	mustRun(t, "system", "unlink", "Lounge", "1")
+	mustRun(t, "system", "rm", "Lounge")
+}

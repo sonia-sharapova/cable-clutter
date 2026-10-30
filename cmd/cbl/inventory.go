@@ -246,8 +246,11 @@ func rmCmd(kind catalog.Kind) *cobra.Command {
 				return fmt.Errorf("%q matches %d %ss; use the id from `ls`", args[0], len(found), kind)
 			}
 			it := found[0]
-			if s := inv.Status[it.ID]; s != library.Free {
-				return fmt.Errorf("#%s is %s; take its system down first", it.ShortID(), s)
+			switch inv.Status[it.ID] {
+			case library.InUse:
+				return fmt.Errorf("#%s is in use by %q; take that system down first", it.ShortID(), inv.HeldBy[it.ID])
+			case library.Reserved:
+				return fmt.Errorf("#%s is pinned by a system's link; remove it with `cbl system unlink` first", it.ShortID())
 			}
 			if err := db.RemoveItem(kind, it.ID); err != nil {
 				return err

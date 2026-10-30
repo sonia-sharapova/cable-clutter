@@ -83,8 +83,9 @@ func TestStatusIsDerivedFromSystems(t *testing.T) {
 	shared, solo, spare := added[0].ID, added[1].ID, added[2].ID
 	for _, s := range []string{
 		`INSERT INTO systems (id, name, active, created_at, updated_at) VALUES ('tv', 'TV', 1, 1, 1), ('desk', 'Desk', 0, 1, 1)`,
+		`INSERT INTO links (id, system_id, part_key, preferred_item, assigned_item, created_at, updated_at) VALUES
+			('l1', 'tv', 'hdmi:m|hdmi:m', '` + shared + `', '` + shared + `', 1, 1)`,
 		`INSERT INTO links (id, system_id, part_key, preferred_item, created_at, updated_at) VALUES
-			('l1', 'tv', 'hdmi:m|hdmi:m', '` + shared + `', 1, 1),
 			('l2', 'desk', 'hdmi:m|hdmi:m', '` + shared + `', 1, 1),
 			('l3', 'desk', 'hdmi:m|hdmi:m', '` + solo + `', 1, 1)`,
 	} {
@@ -100,6 +101,9 @@ func TestStatusIsDerivedFromSystems(t *testing.T) {
 		if got := inv.Status[id]; got != want {
 			t.Errorf("status = %s, want %s", got, want)
 		}
+	}
+	if inv.HeldBy[shared] != "TV" {
+		t.Errorf("HeldBy = %q, want TV", inv.HeldBy[shared])
 	}
 	// Taking the TV down frees the shared cable back to reserved.
 	db.Exec(`UPDATE systems SET active = 0 WHERE id = 'tv'`)

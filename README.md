@@ -35,6 +35,17 @@ cbl device PS2                                  # its ports: what each does, wha
 cbl device ls / rm
 cbl catalog devices                             # known models
 
+cbl system new "Retro corner"                   # a setup you run
+cbl system add-link "Retro corner" "grey ps2 av" --from PS2 --to "CRT TV"
+                                                # pin one of your cables (or name a
+                                                #   type for any free one); ports are
+                                                #   filled in when only one fits
+cbl system up "Retro corner"                    # its cables become in use
+cbl system up Lounge --switch                   # take conflicting systems down first
+cbl system up Lounge --wish                     # or add what's missing to the wishlist
+cbl system down "Retro corner"                  # disconnect: cables come back
+cbl system ls / show / unlink / rm              # ls flags systems that can't be up together
+
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals
@@ -52,6 +63,7 @@ cbl find aux --timing     # print load and query times
 | `internal/outline` | Draws a part's ends side by side; golden tests in `testdata/` (`go test ./internal/outline -update` to refresh). |
 | `catalog/devices.yaml` | Device models and their ports (connector, direction, signals, voltage). `confirmed: false` marks port lists resting on an assumption. |
 | `internal/advise` | Per-port report: what you own that fits, what it lets you do, what to buy for the rest, and power supplies of the wrong voltage. |
+| `internal/plan` | Which item each link uses when a system comes up (pinned, then dedicated, then any spare), and which systems conflict over cables or device ports. |
 | `internal/library` | The user's own data in SQLite (WAL), with numbered migrations. |
 | `cmd/cbl` | The CLI. |
 

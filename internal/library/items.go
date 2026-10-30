@@ -31,13 +31,13 @@ func (it *Item) ShortID() string {
 	return strings.ReplaceAll(it.ID, "-", "")[26:]
 }
 
-// Status is derived from links and active systems; it is never stored.
+// Status is derived from links and systems; it is never stored.
 type Status int
 
 const (
 	Free     Status = iota
-	Reserved        // linked only in inactive systems
-	InUse           // linked in an active system
+	Reserved        // pinned by a system's link, not in use
+	InUse           // assigned to a link of an active system
 )
 
 func (s Status) String() string {
@@ -49,6 +49,7 @@ type Inventory struct {
 	Items  map[string]*Item   // id -> item
 	Owned  map[string][]*Item // part key -> items, oldest first
 	Status map[string]Status  // id -> status
+	HeldBy map[string]string  // id -> name of the active system using it
 	Order  []*Item            // all items, oldest first
 }
 
@@ -163,7 +164,7 @@ func (db *DB) LoadInventory(kind catalog.Kind) (*Inventory, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	inv := &Inventory{Items: map[string]*Item{}, Owned: map[string][]*Item{}, Status: map[string]Status{}}
+	inv := &Inventory{Items: map[string]*Item{}, Owned: map[string][]*Item{}, Status: map[string]Status{}, HeldBy: map[string]string{}}
 	for rows.Next() {
 		it := &Item{Kind: kind}
 		if err := rows.Scan(&it.ID, &it.PartKey, &it.Nickname, &it.Color, &it.Location, &it.Notes, &it.Dedicated, &it.CreatedAt); err != nil {
@@ -178,30 +179,45 @@ func (db *DB) LoadInventory(kind catalog.Kind) (*Inventory, error) {
 		return nil, err
 	}
 
-	// An item linked in any active system is in use; linked only in inactive
-	// systems, it is reserved.
-	links, err := db.Query(`SELECT l.preferred_item, MAX(s.active) FROM links l
-		JOIN systems s ON s.id = l.system_id AND s.deleted = 0
-		WHERE l.deleted = 0 AND l.preferred_item IS NOT NULL GROUP BY l.preferred_item`)
+	// In use: assigned to a link of an active system. Reserved: pinned as a
+	// link's preferred item, and not in use.
+	used, err := db.Query(`SELECT l.assigned_item, s.name FROM links l
+		JOIN systems s ON s.id = l.system_id AND s.deleted = 0 AND s.active = 1
+		WHERE l.deleted = 0 AND l.assigned_item IS NOT NULL`)
 	if err != nil {
 		return nil, err
 	}
-	defer links.Close()
-	for links.Next() {
-		var id string
-		var active bool
-		if err := links.Scan(&id, &active); err != nil {
+	defer used.Close()
+	for used.Next() {
+		var id, system string
+		if err := used.Scan(&id, &system); err != nil {
 			return nil, err
 		}
-		if _, ok := inv.Items[id]; !ok {
-			continue // a link to the other kind of item
-		}
-		inv.Status[id] = Reserved
-		if active {
+		if _, ok := inv.Items[id]; ok { // else an item of the other kind
 			inv.Status[id] = InUse
+			inv.HeldBy[id] = system
 		}
 	}
-	return inv, links.Err()
+	if err := used.Err(); err != nil {
+		return nil, err
+	}
+	pinned, err := db.Query(`SELECT DISTINCT l.preferred_item FROM links l
+		JOIN systems s ON s.id = l.system_id AND s.deleted = 0
+		WHERE l.deleted = 0 AND l.preferred_item IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer pinned.Close()
+	for pinned.Next() {
+		var id string
+		if err := pinned.Scan(&id); err != nil {
+			return nil, err
+		}
+		if s, ok := inv.Status[id]; ok && s == Free {
+			inv.Status[id] = Reserved
+		}
+	}
+	return inv, pinned.Err()
 }
 
 // Lookup finds items by short id, full id or nickname (case-insensitive).
