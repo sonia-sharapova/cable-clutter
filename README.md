@@ -76,6 +76,9 @@ cbl spare                                       # what fits none of your devices
                                                 #   worth a second of
 cbl graph [--format text|mermaid|dot] [--device PS2]
 
+cbl serve --open                                # the same library as a web page, on
+                                                #   this computer only (127.0.0.1:7878)
+
 cbl find aux              # connectors, cables and adapters matching a name or alias
 cbl find "usb c"
 cbl catalog cables        # list connectors | cables | adapters | signals

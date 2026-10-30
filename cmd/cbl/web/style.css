@@ -1,0 +1,107 @@
+/* After the Solar theme of solar.lowtechmagazine.com: cream paper, the
+   browser's own serif, monospace for metadata, no web fonts or images. */
+:root {
+  --color-primary: black;
+  --color-sub: rgb(130 130 130);
+  --color-bg: #fff5d1;
+  --color-free: #006951;
+  --color-reserved: #162dab;
+  --color-inuse: #d11305;
+  --highlight: rgb(0 0 0 / 0.07);
+  --monospace: ui-monospace, Menlo, Consolas, monospace;
+  --font-small: 0.72rem;
+  --max-content-width: 36rem;
+  --pad: 0.5rem;
+  --pad-large: 1rem;
+  --pad-xlarge: 2rem;
+}
+@media (max-width: 550px) { :root { --font-small: 0.8rem; } }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 19px; }
+body {
+  background: var(--color-bg);
+  color: var(--color-primary);
+  padding: var(--pad-large);
+  line-height: 1.4;
+}
+a { color: inherit; }
+.meta, label, nav, footer, button, input, select, code, pre, .kind, .status {
+  font-family: var(--monospace);
+}
+.meta { font-size: var(--font-small); color: var(--color-sub); }
+
+.site-header, main, footer { max-width: var(--max-content-width); margin: 0 auto; }
+.site-header { margin-bottom: var(--pad-xlarge); }
+.site-header h1 { font-size: 1.5rem; font-weight: normal; letter-spacing: 0.02em; }
+.site-header h1 a { text-decoration: none; }
+nav a { margin-right: var(--pad-large); }
+nav a[aria-current] { color: var(--color-primary); text-decoration: none; }
+
+label { display: block; margin-bottom: var(--pad); }
+input[type=search] {
+  width: 100%;
+  font-size: 1.1rem;
+  padding: var(--pad) 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--color-primary);
+  outline: none;
+  border-radius: 0;
+}
+#timing { margin: var(--pad) 0 var(--pad-large); }
+
+#results { list-style: none; }
+#results li { padding: var(--pad) var(--pad); margin: 0 calc(-1 * var(--pad)); cursor: pointer; }
+#results li[aria-selected=true] { background: var(--highlight); }
+#results li:hover { background: var(--highlight); }
+.title { font-size: 1rem; }
+.kind { font-size: var(--font-small); color: var(--color-sub); text-transform: uppercase; margin-right: var(--pad); }
+.sub { display: block; font-size: var(--font-small); color: var(--color-sub); font-family: var(--monospace); }
+
+.status { font-size: var(--font-small); white-space: nowrap; }
+.status::before { content: "\25CF  "; }
+.free, .up { color: var(--color-free); }
+.reserved { color: var(--color-reserved); }
+.inuse, .down.blocked { color: var(--color-inuse); }
+.down { color: var(--color-sub); }
+
+#view h2 { font-size: 1.4rem; font-weight: normal; margin: var(--pad-large) 0 var(--pad); }
+#view h3 { font-size: 1rem; margin: var(--pad-large) 0 0.15rem; }
+#view p, #view ul, #view table, #view pre { margin-bottom: var(--pad); }
+#view ul { list-style: none; }
+#view li { margin: 0.15rem 0; }
+.back { display: inline-block; margin-bottom: var(--pad); }
+pre {
+  font-size: 0.68rem;
+  line-height: 1.25;
+  overflow-x: auto;
+  padding: var(--pad-large) 0;
+  border-top: 1px dashed var(--color-sub);
+  border-bottom: 1px dashed var(--color-sub);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th { text-align: left; font-weight: normal; font-family: var(--monospace); font-size: var(--font-small); color: var(--color-sub); }
+td, th { padding: 0.2rem var(--pad) 0.2rem 0; vertical-align: top; }
+.can { color: var(--color-free); }
+.cant { color: var(--color-reserved); }
+.warn { color: var(--color-inuse); }
+.note { font-style: italic; }
+
+button, select {
+  font-size: var(--font-small);
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  border-radius: 0;
+}
+button:hover { background: var(--color-primary); color: var(--color-bg); }
+.row { display: flex; gap: var(--pad); align-items: center; flex-wrap: wrap; margin: var(--pad) 0; }
+
+footer { margin-top: 3rem; padding-top: var(--pad-large); border-top: 1px solid var(--color-sub); }
+footer > * { margin-bottom: var(--pad); }
+.cells { letter-spacing: -0.05em; color: var(--color-primary); }
+.cells .used { color: var(--color-inuse); }
+.keys { font-size: 0.62rem; }

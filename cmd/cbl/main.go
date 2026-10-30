@@ -49,7 +49,7 @@ func newRoot() *cobra.Command {
 	root.PersistentFlags().BoolVar(&timing, "timing", false, "print load and query times to stderr")
 	root.PersistentFlags().BoolVar(&jsonOut, "json", false, "print JSON instead of text")
 	root.AddCommand(
-		findCmd(), showCmd(), deviceCmd(), systemCmd(), connectCmd(), planCmd(), reachCmd(), bestBuyCmd(), spareCmd(), graphCmd(), wishCmd(), exportCmd(), importCmd(), catalogCmd(), doctorCmd(),
+		findCmd(), showCmd(), deviceCmd(), systemCmd(), connectCmd(), planCmd(), reachCmd(), bestBuyCmd(), spareCmd(), graphCmd(), wishCmd(), exportCmd(), importCmd(), serveCmd(), catalogCmd(), doctorCmd(),
 		addCmd(catalog.KindCable), lsCmd(catalog.KindCable), rmCmd(catalog.KindCable), adapterCmd(),
 	)
 	return root

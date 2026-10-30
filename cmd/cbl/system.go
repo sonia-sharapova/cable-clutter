@@ -344,10 +344,17 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 				return fmt.Errorf("%q has no links yet; add some with `cbl system add-link`", s.Name)
 			}
 
+			up, err := st.bringUp(s, switchOver)
+			if err != nil {
+				return err
+			}
+			for _, name := range up.TookDown {
+				fmt.Fprintf(out, "Took %q down.\n", name)
+			}
 			// Owning too few at all: only buying fixes it.
-			if missing := plan.Short(st.c, links, st.inv); len(missing) > 0 {
+			if len(up.Missing) > 0 {
 				var wished []string
-				for _, m := range missing {
+				for _, m := range up.Missing {
 					fmt.Fprintf(out, "%q needs %d × %s; you own %d.\n", s.Name, m.Need, st.partName(m.PartKey), m.Owned)
 					if wish {
 						if err := st.db.AddWish(m.PartKey, m.Need-m.Owned, s.ID, ""); err != nil {
@@ -362,54 +369,15 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 				}
 				err := fmt.Errorf("%q can't come up until you have them", s.Name)
 				if jsonOut {
-					emit(cmd, map[string]any{"error": err.Error(), "missing": missing, "wished": wished})
+					emit(cmd, map[string]any{"error": err.Error(), "missing": up.Missing, "wished": wished})
 					return errReported
 				}
 				return err
 			}
-
-			ports := plan.NewPorts(st.c, st.devices)
-			picks, short := plan.Allocate(st.c, links, st.inv)
-			busy := plan.BusyPorts(ports, s, st.systems, st.links)
-			tookDown := []string{}
-			if (len(short) > 0 || len(busy) > 0) && switchOver {
-				holders := map[string]bool{}
-				for _, sh := range short {
-					for _, h := range sh.HeldBy {
-						holders[h] = true
-					}
-				}
-				for _, b := range busy {
-					for _, h := range b.HeldBy {
-						holders[h] = true
-					}
-				}
-				for _, other := range st.systems {
-					if holders[other.Name] {
-						if err := st.db.TakeDown(other.ID); err != nil {
-							return err
-						}
-						fmt.Fprintf(out, "Took %q down.\n", other.Name)
-						tookDown = append(tookDown, other.Name)
-					}
-				}
-				if err := st.reload(); err != nil {
-					return err
-				}
-				picks, short = plan.Allocate(st.c, links, st.inv)
-				busy = plan.BusyPorts(ports, s, st.systems, st.links)
+			if len(up.Short) > 0 || len(up.Busy) > 0 {
+				return conflict(cmd, out, st, s, up.Short, up.Busy, wish)
 			}
-			if len(short) > 0 || len(busy) > 0 {
-				return conflict(cmd, out, st, s, short, busy, wish)
-			}
-
-			assigned := map[string]string{}
-			for _, p := range picks {
-				assigned[p.Link.ID] = p.Item.ID
-			}
-			if err := st.db.BringUp(s.ID, assigned); err != nil {
-				return err
-			}
+			picks, tookDown := up.Picks, up.TookDown
 			type useView struct {
 				Link      string `json:"link"`
 				Item      string `json:"item"`
@@ -439,6 +407,68 @@ down first, and --wish adds the missing items to your wishlist instead.`,
 	cmd.Flags().BoolVar(&switchOver, "switch", false, "take down the systems holding the cables this one needs")
 	cmd.Flags().BoolVar(&wish, "wish", false, "add the cables you're missing to your wishlist")
 	return cmd
+}
+
+// upAttempt is what happened when bringing a system up. Unless Picks is set,
+// nothing changed (apart from systems taken down to make room).
+type upAttempt struct {
+	Missing  []plan.Missing   // you own too few of a type at all
+	Short    []plan.Shortage  // items busy in other systems
+	Busy     []plan.PortClash // device ports other systems fill
+	TookDown []string         // systems taken down by switchOver
+	Picks    []plan.Pick      // the items now in use
+}
+
+// bringUp brings s up if every link gets an item and every port is free.
+// With switchOver, systems holding what it needs are taken down first.
+func (st *state) bringUp(s *library.System, switchOver bool) (*upAttempt, error) {
+	links := st.links[s.ID]
+	up := &upAttempt{TookDown: []string{}}
+	if up.Missing = plan.Short(st.c, links, st.inv); len(up.Missing) > 0 {
+		return up, nil
+	}
+	ports := plan.NewPorts(st.c, st.devices)
+	picks, short := plan.Allocate(st.c, links, st.inv)
+	busy := plan.BusyPorts(ports, s, st.systems, st.links)
+	if (len(short) > 0 || len(busy) > 0) && switchOver {
+		holders := map[string]bool{}
+		for _, sh := range short {
+			for _, h := range sh.HeldBy {
+				holders[h] = true
+			}
+		}
+		for _, b := range busy {
+			for _, h := range b.HeldBy {
+				holders[h] = true
+			}
+		}
+		for _, other := range st.systems {
+			if holders[other.Name] {
+				if err := st.db.TakeDown(other.ID); err != nil {
+					return nil, err
+				}
+				up.TookDown = append(up.TookDown, other.Name)
+			}
+		}
+		if err := st.reload(); err != nil {
+			return nil, err
+		}
+		picks, short = plan.Allocate(st.c, links, st.inv)
+		busy = plan.BusyPorts(ports, s, st.systems, st.links)
+	}
+	if len(short) > 0 || len(busy) > 0 {
+		up.Short, up.Busy = short, busy
+		return up, nil
+	}
+	assigned := map[string]string{}
+	for _, p := range picks {
+		assigned[p.Link.ID] = p.Item.ID
+	}
+	if err := st.db.BringUp(s.ID, assigned); err != nil {
+		return nil, err
+	}
+	up.Picks = picks
+	return up, nil
 }
 
 // conflict explains why a system can't come up and what to do about it.

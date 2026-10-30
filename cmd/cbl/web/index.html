@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cable Clutter</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <h1><a href="#">CABLE&larr;CLUTTER</a></h1>
+  <nav class="meta">
+    <a href="#">Search</a>
+    <a href="#connect">Connect</a>
+    <a href="#systems">Systems</a>
+    <a href="#wish">Wishlist</a>
+  </nav>
+</header>
+
+<main>
+  <section id="search">
+    <label for="q" class="meta">Look up a cable, connector, device or setup</label>
+    <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="aux, usb c, ps2, drawer 2&hellip;">
+    <p id="timing" class="meta">&nbsp;</p>
+    <ol id="results"></ol>
+  </section>
+  <section id="view" hidden></section>
+</main>
+
+<footer class="meta">
+  <div id="meter"></div>
+  <div id="stats"></div>
+  <p class="keys">/ search &middot; &uarr;&darr; move &middot; enter open &middot; esc back</p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
