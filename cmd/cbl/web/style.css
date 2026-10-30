@@ -136,8 +136,8 @@ button[disabled]:hover { background: transparent; color: var(--color-primary); }
 
 .toolbar { display: flex; gap: var(--pad); align-items: center; flex-wrap: wrap; margin: var(--pad) 0; }
 .toolbar input.inline { flex: 1; }
-/* Inventory filter: an underlined "Filter ⌄" under the title; the dropdowns
-   open below it on hover (or when clicked open), with no box around them. */
+/* Inventory filter: an underlined "Filter ⌄" under the title; clicking it
+   opens the dropdowns below it, with no box around them. */
 .filter-bar { display: grid; grid-template-columns: auto 1fr; column-gap: var(--pad-large); align-items: stretch; margin: var(--pad) 0; }
 .filter-bar input.inline { align-self: center; }
 button.trigger {
@@ -150,8 +150,8 @@ button.trigger::after {
   border-right: 1px solid; border-bottom: 1px solid; transform: rotate(45deg); transition: transform 0.15s;
 }
 .filter-panel { grid-column: 1 / -1; display: none; flex-wrap: wrap; gap: var(--pad) var(--pad-large); padding: var(--pad) 0; }
-.trigger:hover ~ .filter-panel, .filter-panel:hover, .filter-panel:focus-within, .filter-bar.open .filter-panel { display: flex; }
-.trigger:hover::after, .filter-bar.open .trigger::after { transform: rotate(-135deg); margin-bottom: -0.1em; }
+.filter-bar.open .filter-panel { display: flex; }
+.filter-bar.open .trigger::after { transform: rotate(-135deg); margin-bottom: -0.1em; }
 .filter-panel label { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; font-size: var(--font-small); color: var(--color-sub); }
 .filter-panel button { align-self: flex-end; }
 table.inventory { margin-top: var(--pad); }

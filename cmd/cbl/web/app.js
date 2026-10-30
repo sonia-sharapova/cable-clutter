@@ -239,8 +239,7 @@ async function showInventory() {
       ...[...connectors].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([id, c]) => [id, `${c.name} (${c.n})`])])),
     el("label", {}, "status", select("status", [["all", "any"], ["available", "available"], ["in use", "in use"], ["reserved", "reserved"]])),
     el("button", { class: "quiet", onclick: () => { Object.assign(invFilter, { kind: "all", category: "all", connector: "", status: "all" }); route(); } }, "clear filters"));
-  // Hovering the trigger opens the panel; a click pins it open (for touch
-  // screens and keyboards).
+  // Clicking the trigger opens and closes the panel.
   const bar = el("div", { class: "filter-bar" + (invFilter.open ? " open" : "") });
   const filterButton = el("button", { class: "trigger", "aria-expanded": String(invFilter.open), onclick: () => {
     invFilter.open = !invFilter.open;
