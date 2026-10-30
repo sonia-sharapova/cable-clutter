@@ -78,6 +78,8 @@ func newServer() http.Handler {
 	mux.HandleFunc("GET /api/system", api(systemHandler))
 	mux.HandleFunc("GET /api/connect", api(connectHandler))
 	mux.HandleFunc("GET /api/wish", api(wishHandler))
+	mux.HandleFunc("GET /api/inventory", api(inventoryHandler))
+	mux.HandleFunc("POST /api/item/add", api(itemAddHandler))
 	mux.HandleFunc("POST /api/system/up", api(systemUpHandler))
 	mux.HandleFunc("POST /api/system/down", api(systemDownHandler))
 	mux.HandleFunc("POST /api/wish/add", api(wishAddHandler))
@@ -425,6 +427,88 @@ func systemDownHandler(st *state, r *http.Request) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"up": false}, st.db.TakeDown(s.ID)
+}
+
+// category groups a signal for the inventory filters: audio, video, data,
+// network, storage or power.
+func category(c *catalog.Catalog, signal string) string {
+	switch {
+	case strings.HasPrefix(signal, "net."):
+		return "network"
+	case strings.HasPrefix(signal, "storage."):
+		return "storage"
+	}
+	return c.Signals[signal].Kind
+}
+
+// inventoryHandler lists every part type you own with its items and what
+// the page filters on: kind, signal categories and connectors.
+func inventoryHandler(st *state, _ *http.Request) (any, error) {
+	type connJSON struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	type rowJSON struct {
+		Key        string     `json:"key"`
+		Name       string     `json:"name"`
+		Kind       string     `json:"kind"`
+		Categories []string   `json:"categories"`
+		Connectors []connJSON `json:"connectors"`
+		Ends       []string   `json:"ends"`
+		Items      []itemView `json:"items"`
+	}
+	rows := []rowJSON{}
+	for _, in := range []*library.Inventory{st.inv.Cables, st.inv.Adapters} {
+		for _, key := range sortedKeys(in.Owned) {
+			p, ok := st.c.Part(key)
+			if !ok {
+				continue
+			}
+			row := rowJSON{Key: key, Name: p.Name, Kind: string(p.Kind), Categories: []string{}, Items: viewItems(st.c, in.Owned[key], in)}
+			for _, s := range p.Signals {
+				if cat := category(st.c, s); !contains(row.Categories, cat) {
+					row.Categories = append(row.Categories, cat)
+				}
+			}
+			for _, e := range p.Ends {
+				name := shortConnector(st.c, e.Connector)
+				if e.Count > 1 {
+					name += fmt.Sprintf(" ×%d", e.Count)
+				}
+				row.Ends = append(row.Ends, name)
+				if !slices.ContainsFunc(row.Connectors, func(c connJSON) bool { return c.ID == e.Connector }) {
+					row.Connectors = append(row.Connectors, connJSON{e.Connector, shortConnector(st.c, e.Connector)})
+				}
+			}
+			rows = append(rows, row)
+		}
+	}
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })
+	return rows, nil
+}
+
+// itemAddHandler logs items you own: "I have one" on a cable's page.
+func itemAddHandler(st *state, r *http.Request) (any, error) {
+	var req struct {
+		Part     string `json:"part"`
+		Qty      int    `json:"qty"`
+		Location string `json:"location"`
+	}
+	if err := readBody(r, &req); err != nil {
+		return nil, err
+	}
+	p, ok := st.c.Part(req.Part)
+	if !ok {
+		return nil, fmt.Errorf("no cable or adapter type %q", req.Part)
+	}
+	if req.Qty < 1 {
+		req.Qty = 1
+	}
+	added, err := st.db.AddItems(library.Item{Kind: p.Kind, PartKey: p.Key, Location: req.Location}, req.Qty)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"added": viewItems(st.c, added, nil)}, nil
 }
 
 // wishAddHandler adds parts to the wishlist, skipping any already wished for.

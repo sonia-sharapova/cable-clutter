@@ -166,3 +166,52 @@ func TestPageRendersThroughFill(t *testing.T) {
 		t.Errorf("app.js calls replaceChildren %d times; only fill() may", n)
 	}
 }
+
+func TestServeInventoryAndItemAdd(t *testing.T) {
+	t.Setenv("CBL_HOME", t.TempDir())
+	mustRun(t, "add", "aux", "rca", "--where", "drawer 2")
+	mustRun(t, "adapter", "add", "sata", "usb-a-3.0")
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+
+	type row struct {
+		Kind       string
+		Categories []string
+		Items      []itemView
+	}
+	inventory := func() map[string]row {
+		res, err := http.Get(srv.URL + "/api/inventory")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var rows []row
+		json.NewDecoder(res.Body).Decode(&rows)
+		byKind := map[string]row{}
+		for _, r := range rows {
+			byKind[r.Kind] = r
+		}
+		return byKind
+	}
+	rows := inventory()
+	if c := rows["cable"]; len(c.Items) != 1 || strings.Join(c.Categories, ",") != "audio" || c.Items[0].Location != "drawer 2" {
+		t.Errorf("cable row = %+v", c)
+	}
+	if a := rows["adapter"]; strings.Join(a.Categories, ",") != "data" {
+		t.Errorf("adapter row = %+v", a)
+	}
+
+	req, _ := http.NewRequest("POST", srv.URL+"/api/item/add", strings.NewReader(`{"part":"rj45:m|rj45:m"}`))
+	req.Header.Set("X-CBL", "1")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != 200 {
+		t.Fatalf("item add: %v %v", err, res.Status)
+	}
+	res.Body.Close()
+	if c := inventory()["cable"]; len(c.Items) != 1 {
+		t.Errorf("cable rows changed unexpectedly: %+v", c)
+	}
+	if out := mustRun(t, "ls"); !strings.Contains(out, "Ethernet cable") {
+		t.Errorf("item added through the page isn't in the inventory:\n%s", out)
+	}
+}

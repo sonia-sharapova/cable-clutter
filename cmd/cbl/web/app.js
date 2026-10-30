@@ -159,7 +159,7 @@ async function route() {
   const [kind, ...rest] = hash.split("/");
   const arg = rest.join("/");
   for (const a of document.querySelectorAll("nav a")) {
-    a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + (["connect", "systems", "wish"].includes(kind) ? kind : ""));
+    a.toggleAttribute("aria-current", a.getAttribute("href") === "#" + (["inventory", "connect", "systems", "wish"].includes(kind) ? kind : ""));
   }
   const view = $("#view");
   $("#search").hidden = kind !== "";
@@ -168,7 +168,7 @@ async function route() {
     $("#q").focus();
     return;
   }
-  const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, connect: showConnect, systems: showSystems, wish: showWish }[kind];
+  const render = { part: showPart, connector: showConnector, device: showDevice, model: showDevice, system: showSystem, inventory: showInventory, connect: showConnect, systems: showSystems, wish: showWish }[kind];
   if (!render) return;
   fill(view, el("p", { class: "meta" }, "…"));
   try {
@@ -189,6 +189,10 @@ async function showPart(key) {
     el("pre", {}, d.outline),
     el("p", {}, "Carries: ", d.signals.join("; ")),
     p.note ? el("p", { class: "note" }, p.note) : null,
+    el("div", { class: "row" },
+      el("button", { onclick: async () => { await api("/api/item/add", { part: p.key }); await refresh(); route(); } },
+        d.items.length ? "I have another" : "I have one"),
+      wishButton([{ key: p.key, name: p.name }], "")),
     d.items.length
       ? el("table", {},
           el("tr", {}, ["your id", "status", "name", "where", "for"].map((h) => el("th", {}, h))),
@@ -196,7 +200,74 @@ async function showPart(key) {
             el("td", { class: "meta", title: ID_HINT + it.short_id }, "#" + it.short_id),
             el("td", {}, statusTag(it.status), it.held_by ? el("span", { class: "meta" }, " " + it.held_by) : null),
             el("td", {}, it.nickname || ""), el("td", {}, it.location || ""), el("td", {}, it.for || ""))))
-      : el("p", { class: "meta" }, "You don't own one. ", el("code", {}, `cbl wish add "${p.name}"`)),
+      : el("p", { class: "meta" }, "You don't own one yet."),
+  ];
+}
+
+// --- inventory: everything you own, filtered in the page ------------------
+
+const invFilter = { kind: "all", category: "all", connector: "", status: "all" };
+
+async function showInventory() {
+  const rows = await api("/api/inventory");
+  const list = el("div", {});
+  const chips = (key, options) => el("div", { class: "filter" },
+    el("span", { class: "meta label" }, key),
+    options.map((o) => el("button", {
+      class: "chip", "aria-pressed": String(invFilter[key] === o),
+      onclick: (e) => {
+        invFilter[key] = o;
+        for (const b of e.target.parentNode.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b === e.target));
+        draw();
+      },
+    }, o)));
+
+  // Only offer categories and connectors that occur in what you own.
+  const categories = [...new Set(rows.flatMap((r) => r.categories))].sort();
+  const connectors = new Map();
+  for (const r of rows) for (const c of r.connectors) connectors.set(c.id, { name: c.name, n: (connectors.get(c.id)?.n || 0) + r.items.length });
+  const connector = el("select", { onchange: (e) => { invFilter.connector = e.target.value; draw(); } },
+    el("option", { value: "" }, "any connector"),
+    [...connectors].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([id, c]) =>
+      el("option", { value: id, selected: invFilter.connector === id }, `${c.name} (${c.n})`)));
+
+  function draw() {
+    const shown = [];
+    for (const r of rows) {
+      if (invFilter.kind !== "all" && r.kind + "s" !== invFilter.kind) continue;
+      if (invFilter.category !== "all" && !r.categories.includes(invFilter.category)) continue;
+      if (invFilter.connector && !r.connectors.some((c) => c.id === invFilter.connector)) continue;
+      const items = invFilter.status === "all" ? r.items : r.items.filter((it) => STATUS[it.status][0] === invFilter.status);
+      if (items.length) shown.push({ ...r, items });
+    }
+    const n = shown.reduce((sum, r) => sum + r.items.length, 0);
+    fill(list,
+      el("p", { class: "meta" }, `Showing ${shown.length} type${shown.length === 1 ? "" : "s"} · ${n} item${n === 1 ? "" : "s"}`),
+      shown.length
+        ? el("table", { class: "inventory" },
+            el("tr", {}, ["item", "ends", "you own", "where"].map((h) => el("th", {}, h))),
+            shown.map((r) => {
+              const free = r.items.filter((it) => it.status === "free").length;
+              const where = [...new Set(r.items.map((it) => it.location).filter(Boolean))].join(", ");
+              return el("tr", {},
+                el("td", {}, el("a", { href: "#part/" + encodeURIComponent(r.key) }, r.name),
+                  el("span", { class: "sub" }, r.kind, " · ", r.categories.join(", "))),
+                el("td", { class: "meta" }, r.ends.join(" ↔ ")),
+                el("td", {}, r.items.length, " ", el("span", { class: "meta" }, free === r.items.length ? "all available" : `${free} available`)),
+                el("td", { class: "meta" }, where));
+            }))
+        : el("p", {}, "Nothing matches these filters."));
+  }
+  draw();
+  const total = rows.reduce((sum, r) => sum + r.items.length, 0);
+  return [
+    el("h2", {}, "Inventory"),
+    el("p", { class: "meta" }, `${total} items of ${rows.length} types. Filter by what they are, what they carry, their plugs, or whether they're free.`),
+    chips("kind", ["all", "cables", "adapters"]),
+    chips("category", ["all", ...categories]),
+    el("div", { class: "filter" }, el("span", { class: "meta label" }, "connector"), connector),
+    chips("status", ["all", "available", "in use", "reserved"]),
+    list,
   ];
 }
 
